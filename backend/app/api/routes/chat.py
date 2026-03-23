@@ -1,24 +1,31 @@
 import asyncio
-import json
+import logging
+import re
+import traceback
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.agents.graph import build_graph
 from app.agents.profiles import AGENT_PROFILES
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# Tool → 오피스 행동 매핑
-TOOL_OFFICE_ACTIONS = {
-    "search_jobs": "searching",
-    "resume_feedback": "reading",
-    "mock_interview": "talking",
-    "breathing_exercise": "meditating",
-    "schedule_routine": "typing",
-    "get_motivation_content": "searching",
-    "analyze_market": "reading",
-    "industry_insight": "thinking",
+# 에이전트 이름 → ID 매핑
+AGENT_NAME_TO_ID = {
+    profile["name"]: agent_id
+    for agent_id, profile in AGENT_PROFILES.items()
 }
+MENTION_PATTERN = re.compile(r"@(" + "|".join(AGENT_NAME_TO_ID.keys()) + r")")
+
+
+def parse_mentions(content: str) -> list[str]:
+    mentioned = []
+    for match in MENTION_PATTERN.finditer(content):
+        agent_id = AGENT_NAME_TO_ID.get(match.group(1))
+        if agent_id and agent_id not in mentioned:
+            mentioned.append(agent_id)
+    return mentioned
 
 
 @router.websocket("/chat/{conversation_id}")
@@ -37,70 +44,104 @@ async def websocket_chat(websocket: WebSocket, conversation_id: str) -> None:
             if not user_message.strip():
                 continue
 
-            # LangGraph 실행
-            result = await graph.ainvoke({
-                "messages": [],
-                "user_message": user_message,
-                "emotion": "",
-                "emotion_intensity": 0,
-                "intent": "",
-                "active_agents": [],
-                "agent_responses": [],
-                "conversation_id": conversation_id,
-                "user_id": "anonymous",
-            })
+            try:
+                chat_mode = data.get("mode", "group")
+                target_agent = data.get("target_agent")
+                mentioned_agents = parse_mentions(user_message)
 
-            # 에이전트 응답을 순차적으로 WebSocket 전송
-            for resp in result.get("agent_responses", []):
-                agent_id = resp["agent_id"]
-                content = resp["content"]
-                delay_ms = resp.get("delay_ms", 0)
+                logger.info(f"Message: {user_message[:50]} | mode={chat_mode} | mentions={mentioned_agents}")
 
-                # 딜레이 적용 (자연스러운 타이밍)
-                if delay_ms > 0:
-                    await asyncio.sleep(delay_ms / 1000)
-
-                # 타이핑 시작 알림
-                await websocket.send_json({
-                    "type": "agent_typing",
-                    "agent_id": agent_id,
-                    "office_action": "thinking",
+                # LangGraph 실행
+                result = await graph.ainvoke({
+                    "messages": [],
+                    "user_message": user_message,
+                    "emotion": "",
+                    "emotion_intensity": 0,
+                    "intent": "",
+                    "active_agents": [],
+                    "agent_responses": [],
+                    "conversation_id": conversation_id,
+                    "user_id": "anonymous",
                 })
 
-                # 타이핑 효과 대기
-                await asyncio.sleep(0.5)
+                responses = result.get("agent_responses", [])
+                logger.info(f"Graph returned {len(responses)} responses: {[r['agent_id'] for r in responses]}")
 
-                # 오피스 행동 업데이트
+                # DM 모드
+                if chat_mode == "dm" and target_agent:
+                    responses = [r for r in responses if r["agent_id"] == target_agent]
+                    if not responses:
+                        from app.agents.nodes import seo_yeon, jun_ho, ha_eun, min_su
+                        modules = {
+                            "seo_yeon": seo_yeon, "jun_ho": jun_ho,
+                            "ha_eun": ha_eun, "min_su": min_su,
+                        }
+                        module = modules.get(target_agent)
+                        if module:
+                            resp = await module.run(result, is_primary=True)
+                            responses = [resp]
+
+                # @멘션 모드
+                elif mentioned_agents:
+                    filtered = [r for r in responses if r["agent_id"] in mentioned_agents]
+                    responded_ids = {r["agent_id"] for r in filtered}
+                    for agent_id in mentioned_agents:
+                        if agent_id not in responded_ids:
+                            from app.agents.nodes import seo_yeon, jun_ho, ha_eun, min_su
+                            modules = {
+                                "seo_yeon": seo_yeon, "jun_ho": jun_ho,
+                                "ha_eun": ha_eun, "min_su": min_su,
+                            }
+                            module = modules.get(agent_id)
+                            if module:
+                                resp = await module.run(result, is_primary=len(filtered) == 0)
+                                filtered.append(resp)
+                    responses = filtered
+
+                logger.info(f"Sending {len(responses)} responses")
+
+                # 응답 전송
+                for resp in responses:
+                    agent_id = resp["agent_id"]
+                    content = resp["content"]
+                    delay_ms = resp.get("delay_ms", 0)
+
+                    if delay_ms > 0:
+                        await asyncio.sleep(delay_ms / 1000)
+
+                    await websocket.send_json({
+                        "type": "agent_typing",
+                        "agent_id": agent_id,
+                        "office_action": "thinking",
+                    })
+
+                    await asyncio.sleep(0.5)
+
+                    await websocket.send_json({
+                        "type": "agent_message_chunk",
+                        "agent_id": agent_id,
+                        "chunk": content,
+                        "is_final": True,
+                    })
+
+                # idle 복귀
                 await websocket.send_json({
                     "type": "office_state",
                     "agents": {
                         aid: {
-                            "action": "talking" if aid == agent_id else "idle",
+                            "action": "idle",
                             "position": AGENT_PROFILES[aid]["office_position"],
                         }
                         for aid in AGENT_PROFILES
                     },
                 })
 
-                # 메시지 청크 전송 (현재는 한번에, 추후 스트리밍 분할 가능)
+            except Exception as e:
+                logger.error(f"Error processing message: {e}\n{traceback.format_exc()}")
                 await websocket.send_json({
-                    "type": "agent_message_chunk",
-                    "agent_id": agent_id,
-                    "chunk": content,
-                    "is_final": True,
+                    "type": "error",
+                    "message": str(e),
                 })
-
-            # 모든 에이전트 idle로 복귀
-            await websocket.send_json({
-                "type": "office_state",
-                "agents": {
-                    aid: {
-                        "action": "idle",
-                        "position": AGENT_PROFILES[aid]["office_position"],
-                    }
-                    for aid in AGENT_PROFILES
-                },
-            })
 
     except WebSocketDisconnect:
         pass

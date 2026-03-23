@@ -1,0 +1,54 @@
+name: Backend CI
+
+on:
+  push:
+    paths: ["backend/**"]
+  pull_request:
+    paths: ["backend/**"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: jobmate
+          POSTGRES_PASSWORD: jobmate
+          POSTGRES_DB: jobmate_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        working-directory: backend
+        run: pip install ".[dev]"
+
+      - name: Lint
+        working-directory: backend
+        run: ruff check .
+
+      - name: Type check
+        working-directory: backend
+        run: mypy app
+
+      - name: Test
+        working-directory: backend
+        env:
+          JOBMATE_DATABASE_URL: postgresql+asyncpg://jobmate:jobmate@localhost:5432/jobmate_test
+          JOBMATE_REDIS_URL: redis://localhost:6379/0
+        run: pytest --cov=app

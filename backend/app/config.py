@@ -17,9 +17,9 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7
 
-    # Gemini
-    gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.0-flash"
+    # OpenAI
+    openai_api_key: str = ""
+    openai_model: str = "gpt-4o-mini"
 
     # External APIs
     saramin_api_key: str = ""

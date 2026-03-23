@@ -1,19 +1,42 @@
 from langgraph.graph import StateGraph, START, END
 
-from app.agents.state import JobMateState
+from app.agents.state import JobMateState, AgentResponse
 from app.agents.router import analyze_emotion, route_agents
+from app.agents.nodes import seo_yeon, jun_ho, ha_eun, min_su
+
+AGENT_MODULES = {
+    "seo_yeon": seo_yeon,
+    "jun_ho": jun_ho,
+    "ha_eun": ha_eun,
+    "min_su": min_su,
+}
 
 
 async def run_agents(state: JobMateState) -> dict:
-    """선택된 에이전트들을 실행하고 응답을 생성한다."""
-    # TODO: 각 에이전트 노드 실행 + Tool Calling
-    return {"agent_responses": []}
+    """선택된 에이전트들을 순차 실행하고 응답을 수집한다."""
+    active = state.get("active_agents", [])
+    responses: list[AgentResponse] = []
+
+    for i, agent_id in enumerate(active):
+        module = AGENT_MODULES.get(agent_id)
+        if module is None:
+            continue
+        is_primary = i == 0
+        response = await module.run(state, is_primary=is_primary)
+        responses.append(response)
+
+    return {"agent_responses": responses}
 
 
 async def compose_responses(state: JobMateState) -> dict:
-    """에이전트 응답을 정렬하고 딜레이를 설정한다."""
-    # TODO: primary 먼저, 보조는 딜레이 추가
-    return {}
+    """에이전트 응답에 딜레이를 설정한다."""
+    responses = state.get("agent_responses", [])
+    for i, resp in enumerate(responses):
+        if i == 0:
+            resp["delay_ms"] = 0
+        else:
+            resp["delay_ms"] = 800 + (i * 700)
+    return {"agent_responses": responses}
 
 
 def build_graph() -> StateGraph:

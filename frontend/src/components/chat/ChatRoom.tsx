@@ -3,6 +3,7 @@ import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { MentionPopup } from "./MentionPopup";
 import { useChatStore } from "@/stores/chatStore";
+import { AgentAvatar } from "@/components/common/AgentAvatar";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { AGENTS } from "@/types/agent";
 import type { AgentId } from "@/types/agent";
@@ -16,30 +17,23 @@ export function ChatRoom() {
 
   const activeRoom = rooms.find((r) => r.id === activeRoomId);
   const isDM = activeRoom?.type === "dm";
-  const roomTitle = isDM ? activeRoom?.name ?? "" : `# ${activeRoom?.name ?? ""}`;
+  const agent = isDM && activeRoom?.agentId ? AGENTS[activeRoom.agentId] : null;
 
   const handleInputChange = (value: string) => {
     setInput(value);
-
-    // @ 감지
     const lastAt = value.lastIndexOf("@");
-    if (lastAt >= 0) {
-      const afterAt = value.slice(lastAt + 1);
-      // 스페이스 없으면 멘션 모드
-      if (!afterAt.includes(" ")) {
-        setShowMention(true);
-        setMentionFilter(afterAt);
-        return;
-      }
+    if (lastAt >= 0 && !value.slice(lastAt + 1).includes(" ")) {
+      setShowMention(true);
+      setMentionFilter(value.slice(lastAt + 1));
+    } else {
+      setShowMention(false);
     }
-    setShowMention(false);
   };
 
   const handleMentionSelect = (agentId: AgentId) => {
     const name = AGENTS[agentId].name;
     const lastAt = input.lastIndexOf("@");
-    const before = input.slice(0, lastAt);
-    setInput(`${before}@${name} `);
+    setInput(`${input.slice(0, lastAt)}@${name} `);
     setShowMention(false);
   };
 
@@ -47,7 +41,6 @@ export function ChatRoom() {
     const text = input.trim();
     if (!text) return;
 
-    // 사용자 메시지 UI 추가
     addMessage(activeRoomId, {
       id: crypto.randomUUID(),
       conversationId: activeRoomId,
@@ -56,7 +49,6 @@ export function ChatRoom() {
       createdAt: new Date().toISOString(),
     });
 
-    // 전송
     if (isDM && activeRoom?.agentId) {
       sendMessage(text, "dm", activeRoom.agentId);
     } else {
@@ -73,40 +65,57 @@ export function ChatRoom() {
         flex: 1,
         display: "flex",
         flexDirection: "column",
-        background: "#1a1d21",
+        background: "var(--bg-primary)",
         minHeight: 0,
       }}
     >
       {/* Header */}
       <div
         style={{
-          padding: "10px 16px",
-          borderBottom: "1px solid #383a3f",
+          padding: "10px 20px",
+          borderBottom: "1px solid var(--border)",
           display: "flex",
           alignItems: "center",
-          gap: 8,
+          gap: 10,
         }}
       >
-        <span style={{ color: "#fff", fontWeight: 700, fontSize: 16 }}>
-          {roomTitle}
-        </span>
-        {isDM && activeRoom?.agentId && (
-          <span style={{ color: "#9a9b9d", fontSize: 13 }}>
-            {AGENTS[activeRoom.agentId].role}
-          </span>
+        {isDM && agent ? (
+          <>
+            <AgentAvatar agentId={agent.id} size={24} />
+            <span style={{ color: agent.color, fontWeight: 700, fontSize: "var(--font-lg)" }}>
+              {agent.name}
+            </span>
+            <span
+              style={{
+                fontSize: 12,
+                color: "var(--text-secondary)",
+                background: `${agent.color}11`,
+                padding: "2px 8px",
+                borderRadius: 4,
+              }}
+            >
+              {agent.role}
+            </span>
+          </>
+        ) : (
+          <>
+            <span style={{ color: "var(--text-muted)", fontSize: 18, fontWeight: 300 }}>#</span>
+            <span style={{ color: "var(--text-white)", fontWeight: 700, fontSize: "var(--font-lg)" }}>
+              {activeRoom?.name ?? "general"}
+            </span>
+            <span style={{ fontSize: 12, color: "var(--text-muted)", marginLeft: 4 }}>
+              팀 전체 채팅
+            </span>
+          </>
         )}
       </div>
 
       <MessageList />
 
-      {/* Mention Popup */}
+      {/* Mention + Input */}
       <div style={{ position: "relative" }}>
         {showMention && (
-          <MentionPopup
-            filter={mentionFilter}
-            onSelect={handleMentionSelect}
-            onClose={() => setShowMention(false)}
-          />
+          <MentionPopup filter={mentionFilter} onSelect={handleMentionSelect} />
         )}
         <MessageInput
           value={input}
@@ -114,7 +123,7 @@ export function ChatRoom() {
           onSend={handleSend}
           placeholder={
             isDM
-              ? `${activeRoom?.name ?? ""}에게 메시지 보내기...`
+              ? `${agent?.name ?? ""}에게 메시지 보내기...`
               : "팀에게 메시지 보내기... (@로 멘션)"
           }
         />

@@ -1,3 +1,5 @@
+import { useRef, useEffect } from "react";
+
 interface Props {
   value: string;
   onChange: (value: string) => void;
@@ -6,19 +8,29 @@ interface Props {
 }
 
 export function MessageInput({ value, onChange, onSend, placeholder }: Props) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
   return (
-    <div style={{ padding: "8px 16px 16px" }}>
+    <div style={{ padding: "8px 20px 20px" }}>
       <div
         style={{
           display: "flex",
-          background: "#222529",
-          borderRadius: 8,
-          border: "1px solid #565856",
+          background: "var(--bg-input)",
+          borderRadius: "var(--radius-lg)",
+          border: "1px solid var(--border-input)",
           padding: "10px 14px",
           gap: 8,
+          transition: "border-color var(--transition-fast)",
         }}
+        onFocus={(e) => (e.currentTarget.style.borderColor = "var(--accent-blue)")}
+        onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border-input)")}
       >
         <input
+          ref={inputRef}
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -34,22 +46,23 @@ export function MessageInput({ value, onChange, onSend, placeholder }: Props) {
             background: "transparent",
             border: "none",
             outline: "none",
-            color: "#d1d2d3",
-            fontSize: 14,
+            color: "var(--text-primary)",
+            fontSize: "var(--font-base)",
           }}
         />
         <button
           onClick={onSend}
           disabled={!value.trim()}
           style={{
-            background: value.trim() ? "#007a5a" : "#383a3f",
-            color: value.trim() ? "#fff" : "#616061",
+            background: value.trim() ? "var(--accent-green)" : "var(--bg-hover)",
+            color: value.trim() ? "#fff" : "var(--text-muted)",
             border: "none",
-            borderRadius: 6,
-            padding: "6px 16px",
+            borderRadius: "var(--radius-md)",
+            padding: "6px 18px",
             cursor: value.trim() ? "pointer" : "default",
             fontWeight: 700,
             fontSize: 13,
+            transition: "all var(--transition-fast)",
           }}
         >
           전송

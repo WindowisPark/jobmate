@@ -1,178 +1,110 @@
+import { useState } from "react";
 import { AGENTS } from "@/types/agent";
 import { useOfficeStore } from "@/stores/officeStore";
 import { useChatStore } from "@/stores/chatStore";
+import { AgentAvatar } from "@/components/common/AgentAvatar";
+import styles from "./Sidebar.module.css";
 
-const AGENT_COLORS: Record<string, string> = {
-  seo_yeon: "#e06c75",
-  jun_ho: "#61afef",
-  ha_eun: "#98c379",
-  min_su: "#e5c07b",
-};
+interface Props {
+  onAgentProfileClick?: (agentId: string) => void;
+}
 
-export function Sidebar() {
+export function Sidebar({ onAgentProfileClick }: Props) {
   const officeAgents = useOfficeStore((s) => s.agents);
   const { rooms, activeRoomId, setActiveRoom, messages } = useChatStore();
+  const [hoveredRoom, setHoveredRoom] = useState<string | null>(null);
 
   const channels = rooms.filter((r) => r.type === "channel");
   const dms = rooms.filter((r) => r.type === "dm");
 
   return (
-    <div
-      style={{
-        width: 240,
-        background: "#19171d",
-        borderRight: "1px solid #383a3f",
-        display: "flex",
-        flexDirection: "column",
-        padding: "16px 12px",
-        overflowY: "auto",
-      }}
-    >
-      {/* Logo */}
-      <div
-        style={{
-          fontSize: 20,
-          fontWeight: 900,
-          color: "#fff",
-          marginBottom: 24,
-          letterSpacing: -0.5,
-        }}
-      >
-        JobMate
+    <aside className={styles.sidebar}>
+      {/* Header */}
+      <div className={styles.header}>
+        <span className={styles.logo}>JobMate</span>
+        <span className={styles.badge}>BETA</span>
       </div>
 
+      <div className={styles.divider} />
+
       {/* Channels */}
-      <SectionLabel>Channels</SectionLabel>
+      <div className={styles.sectionLabel}>Channels</div>
       {channels.map((room) => (
-        <RoomItem
+        <div
           key={room.id}
-          label={`# ${room.name}`}
-          isActive={activeRoomId === room.id}
-          hasUnread={false}
+          className={`${styles.roomItem} ${activeRoomId === room.id ? styles.active : ""}`}
           onClick={() => setActiveRoom(room.id)}
-        />
+          onMouseEnter={() => setHoveredRoom(room.id)}
+          onMouseLeave={() => setHoveredRoom(null)}
+        >
+          <span className={styles.channelHash}>#</span>
+          <span>{room.name}</span>
+          {activeRoomId !== room.id && (messages[room.id]?.length ?? 0) > 0 && (
+            <span className={styles.unreadDot} />
+          )}
+        </div>
       ))}
 
-      {/* DMs */}
-      <SectionLabel style={{ marginTop: 20 }}>Direct Messages</SectionLabel>
+      <div className={styles.divider} />
+
+      {/* Direct Messages */}
+      <div className={styles.sectionLabel}>Direct Messages</div>
       {dms.map((room) => {
         const agent = room.agentId ? AGENTS[room.agentId] : null;
-        const color = room.agentId ? AGENT_COLORS[room.agentId] ?? "#aaa" : "#aaa";
+        if (!agent) return null;
         const officeState = room.agentId ? officeAgents[room.agentId] : null;
-        const isOnline = officeState?.behavior === "typing" || officeState?.behavior === "walking_to_desk";
-        const roomMessages = messages[room.id] ?? [];
-        const hasUnread = roomMessages.length > 0 && activeRoomId !== room.id;
+        const isActive = officeState?.behavior === "typing" || officeState?.behavior === "walking_to_desk";
+        const isSelected = activeRoomId === room.id;
 
         return (
           <div
             key={room.id}
+            className={`${styles.dmItem} ${isSelected ? styles.active : ""}`}
             onClick={() => setActiveRoom(room.id)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              padding: "7px 10px",
-              borderRadius: 6,
-              cursor: "pointer",
-              background: activeRoomId === room.id ? "#1164a3" : "transparent",
-            }}
+            onMouseEnter={() => setHoveredRoom(room.id)}
+            onMouseLeave={() => setHoveredRoom(null)}
           >
-            <div style={{ position: "relative" }}>
+            {/* Avatar */}
+            <div className={styles.dmAvatarWrap}>
+              <AgentAvatar agentId={agent.id} size={32} />
               <div
-                style={{
-                  width: 26,
-                  height: 26,
-                  borderRadius: 6,
-                  background:
-                    activeRoomId === room.id ? "rgba(255,255,255,0.2)" : color + "22",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: activeRoomId === room.id ? "#fff" : color,
-                  fontSize: 12,
-                  fontWeight: 700,
-                }}
-              >
-                {agent?.name[0]}
-              </div>
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: -1,
-                  right: -1,
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background: isOnline ? "#44b700" : "#44b700",
-                  border: "2px solid #19171d",
-                }}
+                className={styles.statusDot}
+                style={{ background: isActive ? "var(--online-green)" : "#44b700" }}
               />
             </div>
-            <div
-              style={{
-                fontSize: 14,
-                color: activeRoomId === room.id ? "#fff" : "#d1d2d3",
-                fontWeight: hasUnread ? 700 : 400,
-              }}
-            >
-              {room.name}
+
+            {/* Info */}
+            <div className={styles.dmInfo}>
+              <span className={styles.dmName} style={{ color: isSelected ? "#fff" : undefined }}>
+                {agent.name}
+              </span>
+              <span className={styles.dmRole}>{agent.role}</span>
             </div>
+
+            {/* Profile button on hover */}
+            {hoveredRoom === room.id && !isSelected && (
+              <button
+                className={styles.profileBtn}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAgentProfileClick?.(agent.id);
+                }}
+                title="프로필 보기"
+              >
+                ···
+              </button>
+            )}
           </div>
         );
       })}
-    </div>
-  );
-}
 
-function SectionLabel({
-  children,
-  style,
-}: {
-  children: React.ReactNode;
-  style?: React.CSSProperties;
-}) {
-  return (
-    <div
-      style={{
-        fontSize: 11,
-        color: "#9a9b9d",
-        marginBottom: 6,
-        fontWeight: 600,
-        textTransform: "uppercase",
-        letterSpacing: 0.5,
-        ...style,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-function RoomItem({
-  label,
-  isActive,
-  hasUnread,
-  onClick,
-}: {
-  label: string;
-  isActive: boolean;
-  hasUnread: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <div
-      onClick={onClick}
-      style={{
-        padding: "6px 10px",
-        fontSize: 14,
-        color: isActive ? "#fff" : "#d1d2d3",
-        fontWeight: hasUnread ? 700 : 400,
-        background: isActive ? "#1164a3" : "transparent",
-        borderRadius: 6,
-        cursor: "pointer",
-      }}
-    >
-      {label}
-    </div>
+      {/* Footer */}
+      <div className={styles.footer}>
+        <div className={styles.footerUser}>
+          <div className={styles.footerAvatar}>나</div>
+          <span>취준생</span>
+        </div>
+      </div>
+    </aside>
   );
 }

@@ -663,26 +663,30 @@ office:{conversation_id}   → 오피스 에이전트 상태 (TTL: 30s)
 
 ## 10. 개발 로드맵
 
-### Phase 1: 기반 구축 (Week 1-2)
-- [ ] 프로젝트 스캐폴딩 + Docker 환경
-- [ ] DB 스키마 + Alembic 마이그레이션
-- [ ] FastAPI 기본 구조 + JWT 인증
-- [ ] Gemini Flash 연동 + 기본 채팅 (단일 에이전트)
+### Phase 1: 기반 구축
+- [x] 프로젝트 스캐폴딩 + Docker 환경
+- [x] DB 스키마 + Alembic 마이그레이션
+- [x] FastAPI 기본 구조 (JWT 구조 포함)
+- [x] GPT-4o mini 연동 + 기본 채팅
 
-### Phase 2: 멀티에이전트 (Week 3-4)
-- [ ] LangGraph 그래프 구현 (라우터 + 4개 에이전트 노드)
-- [ ] Tool Calling 구현 (8개 Tool)
-- [ ] 에이전트 프롬프트 엔지니어링 + 성격 튜닝
-- [ ] WebSocket 스트리밍
+### Phase 2: 멀티에이전트
+- [x] LangGraph 그래프 구현 (라우터 + 4개 에이전트 노드)
+- [x] Tool Calling 구현 (8개 Tool — OpenAI Function Calling)
+- [x] 에이전트 프롬프트 엔지니어링 + 성격 튜닝
+- [x] WebSocket 스트리밍
 
-### Phase 3: 프론트엔드 (Week 5-6)
-- [ ] Slack 스타일 채팅 UI
-- [ ] Pixi.js 픽셀아트 오피스
-- [ ] 에이전트 스프라이트 제작 + 애니메이션
-- [ ] Tool 실행 ↔ 오피스 행동 연동
+### Phase 3: 프론트엔드
+- [x] Slack 스타일 채팅 UI (그룹채팅 + @멘션 + 1:1 DM)
+- [x] Canvas 픽셀아트 오피스 (타일맵 + 가구 + 조명 효과)
+- [x] 에이전트 캐릭터 (Canvas 스프라이트 + SVG 일러스트 프로필)
+- [x] Tool 실행 ↔ 오피스 행동 연동 (이동 → 앉기 → 타이핑)
+- [x] 온보딩 화면 + 에이전트 프로필 모달
 
-### Phase 4: 완성 (Week 7-8)
-- [ ] 감정 분석 고도화 + 대화 흐름 개선
-- [ ] 에이전트 간 자연스러운 상호작용
-- [ ] Docker 배포 + CI/CD
-- [ ] 성능 최적화 + 에러 핸들링
+### Phase 4: 완성
+- [x] 감정 분석 (GPT 기반 감정/의도 분류 → 에이전트 라우팅)
+- [x] 에이전트 간 자연스러운 상호작용 (서로 언급, 보조 참여)
+- [ ] JWT 인증 구현 (회원가입/로그인)
+- [ ] DB 메시지 영속화 (현재 메모리 only)
+- [ ] 대화 히스토리 LLM 반영 (맥락 유지)
+- [ ] Docker 배포 (Cloud Run / ECS)
+- [ ] 성능 최적화 + 에러 핸들링 고도화

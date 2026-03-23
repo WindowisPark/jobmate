@@ -1,5 +1,6 @@
 import { AGENTS, AGENT_IDS } from "@/types/agent";
 import type { AgentId } from "@/types/agent";
+import { AgentAvatar } from "@/components/common/AgentAvatar";
 
 interface Props {
   filter: string;
@@ -60,21 +61,7 @@ export function MentionPopup({ filter, onSelect }: Props) {
             onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-tertiary)")}
             onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
           >
-            <div
-              style={{
-                width: 30,
-                height: 30,
-                borderRadius: "var(--radius-md)",
-                background: `${agent.color}22`,
-                border: `1.5px solid ${agent.color}44`,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 16,
-              }}
-            >
-              {agent.emoji}
-            </div>
+            <AgentAvatar agentId={id} size={30} />
             <div>
               <div style={{ fontSize: 14, color: agent.color, fontWeight: 600 }}>
                 {agent.name}

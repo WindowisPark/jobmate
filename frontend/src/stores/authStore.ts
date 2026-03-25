@@ -1,21 +1,30 @@
 import { create } from "zustand";
 
+interface UserInfo {
+  id: string;
+  email: string;
+  nickname: string;
+  avatar_url: string | null;
+}
+
 interface AuthState {
-  accessToken: string | null;
-  userId: string | null;
-  nickname: string | null;
-  setAuth: (token: string, userId: string, nickname: string) => void;
+  user: UserInfo | null;
+  isGuest: boolean;
+  isLoading: boolean;
+
+  setUser: (user: UserInfo) => void;
+  setGuest: () => void;
   clearAuth: () => void;
+  setLoading: (v: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
-  accessToken: null,
-  userId: null,
-  nickname: null,
+  user: null,
+  isGuest: false,
+  isLoading: true,
 
-  setAuth: (token, userId, nickname) =>
-    set({ accessToken: token, userId, nickname }),
-
-  clearAuth: () =>
-    set({ accessToken: null, userId: null, nickname: null }),
+  setUser: (user) => set({ user, isGuest: false, isLoading: false }),
+  setGuest: () => set({ user: null, isGuest: true, isLoading: false }),
+  clearAuth: () => set({ user: null, isGuest: false, isLoading: false }),
+  setLoading: (v) => set({ isLoading: v }),
 }));

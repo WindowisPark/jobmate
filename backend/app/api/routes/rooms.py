@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -9,15 +9,28 @@ from sqlalchemy.orm import selectinload
 from app.dependencies import get_db
 from app.models.conversation import Conversation
 from app.models.message import Message
-from app.services.chat_service import ensure_anonymous_user
+from app.api.middleware.auth import get_optional_user_id
+from app.services.chat_service import ANONYMOUS_USER_ID, ensure_anonymous_user
 
 router = APIRouter()
 
 
+async def _resolve_user_id(request: Request, db: AsyncSession) -> uuid.UUID:
+    """인증된 유저면 user_id, 게스트면 anonymous user_id 반환."""
+    user_id = await get_optional_user_id(request)
+    if user_id:
+        return user_id
+    return await ensure_anonymous_user(db)
+
+
 @router.get("")
-async def list_conversations(db: AsyncSession = Depends(get_db)) -> list[dict]:
-    """대화 목록을 최신순으로 반환한다."""
-    # 각 대화의 마지막 메시지 시각과 메시지 수를 함께 조회
+async def list_conversations(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> list[dict]:
+    """현재 유저의 대화 목록을 최신순으로 반환한다."""
+    user_id = await _resolve_user_id(request, db)
+
     result = await db.execute(
         select(
             Conversation,
@@ -25,6 +38,7 @@ async def list_conversations(db: AsyncSession = Depends(get_db)) -> list[dict]:
             func.max(Message.created_at).label("last_message_at"),
         )
         .outerjoin(Message, Message.conversation_id == Conversation.id)
+        .where(Conversation.user_id == user_id)
         .group_by(Conversation.id)
         .order_by(Conversation.updated_at.desc())
     )
@@ -45,14 +59,16 @@ async def list_conversations(db: AsyncSession = Depends(get_db)) -> list[dict]:
 
 
 @router.post("")
-async def create_conversation(db: AsyncSession = Depends(get_db)) -> dict:
+async def create_conversation(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
     """새 대화를 생성한다."""
-    # TODO: JWT 인증 후 실제 user_id 사용
-    anonymous_user_id = await ensure_anonymous_user(db)
+    user_id = await _resolve_user_id(request, db)
 
     conv = Conversation(
         id=uuid.uuid4(),
-        user_id=anonymous_user_id,
+        user_id=user_id,
         title=None,
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow(),
@@ -70,12 +86,15 @@ async def create_conversation(db: AsyncSession = Depends(get_db)) -> dict:
 @router.get("/{conversation_id}")
 async def get_conversation(
     conversation_id: uuid.UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """대화 상세 정보와 메시지 목록을 반환한다."""
+    user_id = await _resolve_user_id(request, db)
+
     result = await db.execute(
         select(Conversation)
-        .where(Conversation.id == conversation_id)
+        .where(Conversation.id == conversation_id, Conversation.user_id == user_id)
         .options(selectinload(Conversation.messages))
     )
     conv = result.scalar_one_or_none()
@@ -109,18 +128,23 @@ async def get_conversation(
 @router.delete("/{conversation_id}")
 async def delete_conversation(
     conversation_id: uuid.UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """대화와 관련 메시지를 삭제한다."""
+    user_id = await _resolve_user_id(request, db)
+
     result = await db.execute(
-        select(Conversation).where(Conversation.id == conversation_id)
+        select(Conversation).where(
+            Conversation.id == conversation_id,
+            Conversation.user_id == user_id,
+        )
     )
     conv = result.scalar_one_or_none()
 
     if conv is None:
         raise HTTPException(status_code=404, detail="대화를 찾을 수 없습니다")
 
-    # 메시지 먼저 삭제
     msg_result = await db.execute(
         select(Message).where(Message.conversation_id == conversation_id)
     )

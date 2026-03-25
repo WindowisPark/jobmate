@@ -685,7 +685,7 @@ office:{conversation_id}   → 오피스 에이전트 상태 (TTL: 30s)
 ### Phase 4: 완성
 - [x] 감정 분석 (GPT 기반 감정/의도 분류 → 에이전트 라우팅)
 - [x] 에이전트 간 자연스러운 상호작용 (서로 언급, 보조 참여)
-- [ ] JWT 인증 구현 (회원가입/로그인)
+- [x] JWT 인증 구현 (httpOnly 쿠키 + Redis Refresh Rotation + 게스트 모드)
 - [x] DB 메시지 영속화 (WebSocket → PostgreSQL 저장 + Conversation CRUD API)
 - [x] 대화 히스토리 LLM 반영 (최근 20개 메시지 컨텍스트 전달)
 - [ ] Docker 배포 (Cloud Run / ECS)

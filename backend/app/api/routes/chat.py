@@ -7,6 +7,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.agents.graph import build_graph
 from app.agents.profiles import AGENT_PROFILES
+from app.api.middleware.auth import get_ws_user_id
 from app.dependencies import async_session
 from app.services.chat_service import (
     get_or_create_conversation,
@@ -40,6 +41,10 @@ async def websocket_chat(websocket: WebSocket, conversation_id: str) -> None:
     await websocket.accept()
     graph = build_graph()
 
+    # 쿠키에서 user_id 추출 (없으면 게스트)
+    ws_user_id = get_ws_user_id(websocket)
+    user_id_str = str(ws_user_id) if ws_user_id else "anonymous"
+
     try:
         while True:
             data = await websocket.receive_json()
@@ -62,7 +67,7 @@ async def websocket_chat(websocket: WebSocket, conversation_id: str) -> None:
                 async with async_session() as db:
                     # 대화방 확보 + 히스토리 로드
                     conv = await get_or_create_conversation(
-                        db, conversation_id, user_id="anonymous"
+                        db, conversation_id, user_id=user_id_str
                     )
                     history = await load_conversation_history(db, conv.id)
 

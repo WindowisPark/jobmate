@@ -25,8 +25,10 @@ async def run(state: JobMateState, is_primary: bool = True) -> AgentResponse:
     system = profile["system_prompt"] + "\n\n" + context
     tools = get_tools_for_agent(profile["tools"]) if is_primary else []
 
+    history = state.get("conversation_history", [])
+
     content, tool_records = await generate_response_with_tools(
-        system, state["user_message"], tools, execute_tool
+        system, state["user_message"], tools, execute_tool, history=history
     )
 
     return AgentResponse(

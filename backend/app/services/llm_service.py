@@ -8,7 +8,31 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
+# 에이전트 ID → 표시 이름 매핑
+_AGENT_NAMES: dict[str, str] = {
+    "seo_yeon": "김서연",
+    "jun_ho": "박준호",
+    "ha_eun": "이하은",
+    "min_su": "정민수",
+}
+
 _client: AsyncOpenAI | None = None
+
+
+def _format_history(history: list[dict]) -> list[dict]:
+    """DB 히스토리를 OpenAI 메시지 형식으로 변환한다."""
+    formatted: list[dict] = []
+    for entry in history:
+        if entry["role"] == "user":
+            formatted.append({"role": "user", "content": entry["content"]})
+        else:
+            agent_id = entry.get("agent_id", "")
+            name = _AGENT_NAMES.get(agent_id, agent_id)
+            formatted.append({
+                "role": "assistant",
+                "content": f"[{name}] {entry['content']}",
+            })
+    return formatted
 
 
 def get_openai_client() -> AsyncOpenAI:
@@ -18,15 +42,23 @@ def get_openai_client() -> AsyncOpenAI:
     return _client
 
 
-async def generate_response(system_prompt: str, user_message: str) -> str:
+async def generate_response(
+    system_prompt: str,
+    user_message: str,
+    history: list[dict] | None = None,
+) -> str:
     """GPT-4o mini로 텍스트 응답을 생성한다 (Tool 없음)."""
     client = get_openai_client()
+    messages = [{"role": "system", "content": system_prompt}]
+
+    if history:
+        messages.extend(_format_history(history))
+
+    messages.append({"role": "user", "content": user_message})
+
     response = await client.chat.completions.create(
         model=settings.openai_model,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message},
-        ],
+        messages=messages,
         temperature=0.8,
         max_tokens=500,
     )
@@ -38,6 +70,7 @@ async def generate_response_with_tools(
     user_message: str,
     tools: list[dict],
     tool_executor: Callable[[str, dict], Awaitable[dict]],
+    history: list[dict] | None = None,
 ) -> tuple[str, list[dict] | None]:
     """GPT-4o mini로 Tool Calling을 포함한 응답을 생성한다.
 
@@ -45,10 +78,12 @@ async def generate_response_with_tools(
         (최종 텍스트 응답, Tool 호출 기록 리스트 or None)
     """
     client = get_openai_client()
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_message},
-    ]
+    messages = [{"role": "system", "content": system_prompt}]
+
+    if history:
+        messages.extend(_format_history(history))
+
+    messages.append({"role": "user", "content": user_message})
 
     # 1차 호출: GPT가 tool 호출 여부 판단
     response = await client.chat.completions.create(

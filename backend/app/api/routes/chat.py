@@ -7,6 +7,13 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.agents.graph import build_graph
 from app.agents.profiles import AGENT_PROFILES
+from app.dependencies import async_session
+from app.services.chat_service import (
+    get_or_create_conversation,
+    load_conversation_history,
+    save_agent_message,
+    save_user_message,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -51,52 +58,82 @@ async def websocket_chat(websocket: WebSocket, conversation_id: str) -> None:
 
                 logger.info(f"Message: {user_message[:50]} | mode={chat_mode} | mentions={mentioned_agents}")
 
-                # LangGraph 실행
-                result = await graph.ainvoke({
-                    "messages": [],
-                    "user_message": user_message,
-                    "emotion": "",
-                    "emotion_intensity": 0,
-                    "intent": "",
-                    "active_agents": [],
-                    "agent_responses": [],
-                    "conversation_id": conversation_id,
-                    "user_id": "anonymous",
-                })
+                # --- DB 영속화 ---
+                async with async_session() as db:
+                    # 대화방 확보 + 히스토리 로드
+                    conv = await get_or_create_conversation(
+                        db, conversation_id, user_id="anonymous"
+                    )
+                    history = await load_conversation_history(db, conv.id)
 
-                responses = result.get("agent_responses", [])
-                logger.info(f"Graph returned {len(responses)} responses: {[r['agent_id'] for r in responses]}")
+                    # 사용자 메시지 저장
+                    await save_user_message(db, conv.id, user_message)
 
-                # DM 모드
-                if chat_mode == "dm" and target_agent:
-                    responses = [r for r in responses if r["agent_id"] == target_agent]
-                    if not responses:
-                        from app.agents.nodes import seo_yeon, jun_ho, ha_eun, min_su
-                        modules = {
-                            "seo_yeon": seo_yeon, "jun_ho": jun_ho,
-                            "ha_eun": ha_eun, "min_su": min_su,
-                        }
-                        module = modules.get(target_agent)
-                        if module:
-                            resp = await module.run(result, is_primary=True)
-                            responses = [resp]
+                    # LangGraph 실행
+                    result = await graph.ainvoke({
+                        "messages": [],
+                        "user_message": user_message,
+                        "conversation_history": history,
+                        "emotion": "",
+                        "emotion_intensity": 0,
+                        "intent": "",
+                        "active_agents": [],
+                        "agent_responses": [],
+                        "conversation_id": conversation_id,
+                        "user_id": "anonymous",
+                    })
 
-                # @멘션 모드
-                elif mentioned_agents:
-                    filtered = [r for r in responses if r["agent_id"] in mentioned_agents]
-                    responded_ids = {r["agent_id"] for r in filtered}
-                    for agent_id in mentioned_agents:
-                        if agent_id not in responded_ids:
+                    responses = result.get("agent_responses", [])
+                    emotion = result.get("emotion", "")
+                    logger.info(f"Graph returned {len(responses)} responses: {[r['agent_id'] for r in responses]}")
+
+                    # DM 모드
+                    if chat_mode == "dm" and target_agent:
+                        responses = [r for r in responses if r["agent_id"] == target_agent]
+                        if not responses:
                             from app.agents.nodes import seo_yeon, jun_ho, ha_eun, min_su
                             modules = {
                                 "seo_yeon": seo_yeon, "jun_ho": jun_ho,
                                 "ha_eun": ha_eun, "min_su": min_su,
                             }
-                            module = modules.get(agent_id)
+                            module = modules.get(target_agent)
                             if module:
-                                resp = await module.run(result, is_primary=len(filtered) == 0)
-                                filtered.append(resp)
-                    responses = filtered
+                                resp = await module.run(result, is_primary=True)
+                                responses = [resp]
+
+                    # @멘션 모드
+                    elif mentioned_agents:
+                        filtered = [r for r in responses if r["agent_id"] in mentioned_agents]
+                        responded_ids = {r["agent_id"] for r in filtered}
+                        for agent_id in mentioned_agents:
+                            if agent_id not in responded_ids:
+                                from app.agents.nodes import seo_yeon, jun_ho, ha_eun, min_su
+                                modules = {
+                                    "seo_yeon": seo_yeon, "jun_ho": jun_ho,
+                                    "ha_eun": ha_eun, "min_su": min_su,
+                                }
+                                module = modules.get(agent_id)
+                                if module:
+                                    resp = await module.run(result, is_primary=len(filtered) == 0)
+                                    filtered.append(resp)
+                        responses = filtered
+
+                    # 에이전트 응답 DB 저장
+                    for resp in responses:
+                        await save_agent_message(
+                            db,
+                            conv.id,
+                            agent_id=resp["agent_id"],
+                            content=resp["content"],
+                            tool_calls=resp.get("tool_calls"),
+                            emotion_tag=emotion or None,
+                        )
+
+                    # 대화 제목 자동 생성
+                    if conv.title is None:
+                        conv.title = user_message[:50] + ("..." if len(user_message) > 50 else "")
+
+                    await db.commit()
 
                 logger.info(f"Sending {len(responses)} responses")
 

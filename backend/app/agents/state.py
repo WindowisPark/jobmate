@@ -14,6 +14,7 @@ class AgentResponse(TypedDict):
 class JobMateState(TypedDict):
     messages: Annotated[list, add_messages]
     user_message: str
+    conversation_history: list[dict]  # DB에서 로드한 이전 대화 히스토리
     emotion: str
     emotion_intensity: int
     intent: str

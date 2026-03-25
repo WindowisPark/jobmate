@@ -1,7 +1,7 @@
 # JobMate — Software Design Document
 
 > 취준생 멘탈 케어 멀티에이전트 챗봇
-> 최종 수정: 2026-03-25
+> 최종 수정: 2026-03-26
 
 ---
 
@@ -19,18 +19,19 @@
 
 | 계층 | 기술 |
 |------|------|
-| LLM | Gemini Flash (google-generativeai) |
+| LLM | GPT-4o mini (OpenAI API) |
 | 에이전트 오케스트레이션 | LangGraph |
 | 백엔드 | Python 3.12+ / FastAPI |
+| 인증 | JWT (httpOnly 쿠키) + Redis Refresh Token Rotation |
 | 실시간 통신 | WebSocket (FastAPI WebSocket) |
-| DB | PostgreSQL 16 |
+| DB | PostgreSQL 16 + SQLAlchemy 2.0 (async) + Alembic |
 | 캐시/세션 | Redis 7 |
-| 프론트엔드 | React 18 + TypeScript 5 |
-| 픽셀아트 오피스 | Pixi.js 8 |
+| 프론트엔드 | React 18 + TypeScript 5 + React Router |
+| 상태관리 | Zustand |
+| 픽셀아트 오피스 | Canvas 2D (스프라이트 애니메이션) |
 | 채팅 UI | 커스텀 Slack-style 컴포넌트 |
-| 컨테이너 | Docker + docker-compose |
-| CI/CD | GitHub Actions |
-| 배포 | GCP Cloud Run 또는 AWS ECS |
+| 컨테이너 | Docker + docker-compose (원커맨드 빌드) |
+| 프론트 서빙 | nginx (SPA fallback + API/WS 프록시) |
 
 ---
 
@@ -647,13 +648,23 @@ Tool 호출 시:  idle → [tool별 행동] → talking → idle
 
 ### 9.1 JWT 플로우
 ```
-로그인 → Access Token (15분) + Refresh Token (7일)
-WebSocket 연결 시 → query param으로 Access Token 전달
-Redis에 세션 저장 → { user_id, active_conversation_id, connected_at }
+회원가입/로그인 → Set-Cookie: access_token (httpOnly, 15분) + refresh_token (httpOnly, 7일)
+API 요청 → 브라우저가 쿠키 자동 전송 → 서버에서 검증
+WebSocket 연결 → 쿠키 자동 전달 (httpOnly 쿠키는 WS에도 포함)
+Access Token 만료 → POST /api/auth/refresh → Rotation (새 토큰 쌍 발급)
+게스트 모드 → 쿠키 없이 접속 → anonymous 유저로 처리
 ```
 
-### 9.2 Redis 키 구조
+### 9.2 Refresh Token Rotation
 ```
+1. 클라이언트: POST /api/auth/refresh (쿠키에서 refresh_token 자동 전달)
+2. 서버: Redis에서 jti 대조 → 일치하면 새 토큰 발급 + 기존 삭제
+3. 탈취 감지: jti 불일치 시 해당 유저 전체 토큰 무효화 + 재로그인 요구
+```
+
+### 9.3 Redis 키 구조
+```
+refresh:{user_id}          → Refresh Token jti (TTL: 7일)
 session:{user_id}          → 세션 정보 (TTL: 24h)
 typing:{conversation_id}   → 현재 타이핑 중인 에이전트 (TTL: 10s)
 office:{conversation_id}   → 오피스 에이전트 상태 (TTL: 30s)

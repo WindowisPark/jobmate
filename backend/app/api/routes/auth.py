@@ -9,7 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.dependencies import get_db, get_redis
 from app.models.user import User
+from pydantic import BaseModel, EmailStr
+
 from app.schemas.user import UserCreate, UserLogin, UserOut
+
+
+class EmailCheck(BaseModel):
+    email: EmailStr
 from app.api.middleware.auth import (
     create_access_token,
     create_refresh_token,
@@ -53,7 +59,7 @@ def _clear_auth_cookies(response: Response) -> None:
 
 @router.post("/check-email")
 async def check_email(
-    body: UserLogin,  # email 필드만 사용
+    body: EmailCheck,
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """이메일 중복 확인."""

@@ -689,4 +689,4 @@ office:{conversation_id}   → 오피스 에이전트 상태 (TTL: 30s)
 - [x] DB 메시지 영속화 (WebSocket → PostgreSQL 저장 + Conversation CRUD API)
 - [x] 대화 히스토리 LLM 반영 (최근 20개 메시지 컨텍스트 전달)
 - [ ] Docker 배포 (Cloud Run / ECS)
-- [ ] 성능 최적화 + 에러 핸들링 고도화
+- [x] 성능 최적화 + 에러 핸들링 (LLM 타임아웃, WS 재연결, DB 풀, ErrorBoundary)

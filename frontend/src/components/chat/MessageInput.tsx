@@ -1,4 +1,6 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useCallback } from "react";
+
+const MAX_LENGTH = 2000;
 
 interface Props {
   value: string;
@@ -9,6 +11,14 @@ interface Props {
 
 export function MessageInput({ value, onChange, onSend, placeholder }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const sendingRef = useRef(false);
+
+  const handleSend = useCallback(() => {
+    if (sendingRef.current || !value.trim()) return;
+    sendingRef.current = true;
+    onSend();
+    setTimeout(() => { sendingRef.current = false; }, 500);
+  }, [value, onSend]);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -33,13 +43,16 @@ export function MessageInput({ value, onChange, onSend, placeholder }: Props) {
           ref={inputRef}
           type="text"
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => {
+            if (e.target.value.length <= MAX_LENGTH) onChange(e.target.value);
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.nativeEvent.isComposing) {
               e.preventDefault();
-              onSend();
+              handleSend();
             }
           }}
+          maxLength={MAX_LENGTH}
           placeholder={placeholder ?? "메시지를 입력하세요..."}
           style={{
             flex: 1,
@@ -51,7 +64,7 @@ export function MessageInput({ value, onChange, onSend, placeholder }: Props) {
           }}
         />
         <button
-          onClick={onSend}
+          onClick={handleSend}
           disabled={!value.trim()}
           style={{
             background: value.trim() ? "var(--accent-green)" : "var(--bg-hover)",

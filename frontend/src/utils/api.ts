@@ -1,5 +1,7 @@
 import { API_BASE_URL } from "./constants";
 
+const FETCH_TIMEOUT = 15_000; // 15 seconds
+
 let isRefreshing = false;
 let refreshPromise: Promise<boolean> | null = null;
 
@@ -21,14 +23,28 @@ async function tryRefresh(): Promise<boolean> {
 }
 
 async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...options?.headers,
-    },
-    ...options,
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+      ...options,
+      signal: controller.signal,
+    });
+  } catch (err: any) {
+    if (err.name === "AbortError") {
+      throw new Error("요청 시간이 초과되었습니다");
+    }
+    throw new Error("서버에 연결할 수 없습니다");
+  } finally {
+    clearTimeout(timer);
+  }
 
   // 401이면 refresh 시도 후 재요청
   if (response.status === 401 && !path.includes("/auth/")) {

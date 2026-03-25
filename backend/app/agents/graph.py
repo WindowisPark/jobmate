@@ -1,8 +1,12 @@
+import logging
+
 from langgraph.graph import StateGraph, START, END
 
 from app.agents.state import JobMateState, AgentResponse
 from app.agents.router import analyze_emotion, route_agents
 from app.agents.nodes import seo_yeon, jun_ho, ha_eun, min_su
+
+logger = logging.getLogger(__name__)
 
 AGENT_MODULES = {
     "seo_yeon": seo_yeon,
@@ -22,8 +26,18 @@ async def run_agents(state: JobMateState) -> dict:
         if module is None:
             continue
         is_primary = i == 0
-        response = await module.run(state, is_primary=is_primary)
-        responses.append(response)
+        try:
+            response = await module.run(state, is_primary=is_primary)
+            responses.append(response)
+        except Exception as e:
+            logger.error(f"Agent {agent_id} failed: {e}", exc_info=True)
+            responses.append(AgentResponse(
+                agent_id=agent_id,
+                content="죄송해요, 잠시 오류가 발생했어요. 다시 말씀해주시겠어요?",
+                tool_calls=None,
+                delay_ms=0,
+                response_type="message",
+            ))
 
     return {"agent_responses": responses}
 

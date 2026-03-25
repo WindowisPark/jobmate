@@ -1,5 +1,8 @@
 export const API_BASE_URL = "/api";
-export const WS_BASE_URL = "ws://localhost:8000/ws";
+export const WS_BASE_URL =
+  import.meta.env.DEV
+    ? "ws://localhost:8000/ws"
+    : `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws`;
 
 export const OFFICE_TILE_SIZE = 48;
 export const OFFICE_COLS = 12;

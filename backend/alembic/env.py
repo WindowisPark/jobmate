@@ -6,9 +6,17 @@ from sqlalchemy import engine_from_config, pool
 from app.models.user import Base
 from app.models import *  # noqa: F401,F403 — import all models for autogenerate
 
+import os
+
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+
+# 환경변수에서 DB URL 오버라이드 (Docker에서 asyncpg → psycopg2 변환)
+db_url = os.environ.get("JOBMATE_DATABASE_URL", "")
+if db_url:
+    sync_url = db_url.replace("+asyncpg", "+psycopg2")
+    config.set_main_option("sqlalchemy.url", sync_url)
 
 target_metadata = Base.metadata
 

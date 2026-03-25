@@ -51,6 +51,18 @@ def _clear_auth_cookies(response: Response) -> None:
     response.delete_cookie("refresh_token", path="/api/auth")
 
 
+@router.post("/check-email")
+async def check_email(
+    body: UserLogin,  # email 필드만 사용
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """이메일 중복 확인."""
+    existing = await db.execute(select(User).where(User.email == body.email))
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="이미 등록된 이메일입니다")
+    return {"available": True}
+
+
 @router.post("/register", response_model=UserOut)
 async def register(
     body: UserCreate,

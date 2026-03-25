@@ -80,7 +80,7 @@ function AppContent() {
 }
 
 export default function App() {
-  const { setUser, setGuest, setLoading } = useAuthStore();
+  const { setUser, setLoading } = useAuthStore();
 
   useEffect(() => {
     // 페이지 로드 시 쿠키로 인증 상태 확인

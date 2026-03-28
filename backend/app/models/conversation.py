@@ -17,4 +17,6 @@ class Conversation(Base):
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
 
     user: Mapped["User"] = relationship(back_populates="conversations")  # noqa: F821
-    messages: Mapped[list["Message"]] = relationship(back_populates="conversation")  # noqa: F821
+    messages: Mapped[list["Message"]] = relationship(  # noqa: F821
+        back_populates="conversation", cascade="all, delete-orphan", passive_deletes=True
+    )

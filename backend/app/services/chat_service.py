@@ -1,7 +1,8 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import select, update as sa_update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.graph import build_graph
@@ -36,31 +37,42 @@ async def get_or_create_conversation(
     conversation_id: str,
     user_id: str,
 ) -> Conversation:
-    """conversation_id로 대화를 조회하거나, 없으면 새로 생성한다."""
+    """conversation_id로 대화를 조회하거나, 없으면 새로 생성한다.
+
+    INSERT...ON CONFLICT DO NOTHING 패턴으로 race condition을 방지한다.
+    """
     try:
         conv_uuid = uuid.UUID(conversation_id)
     except ValueError:
         conv_uuid = uuid.uuid5(uuid.NAMESPACE_URL, conversation_id)
 
+    # 먼저 조회 시도 (대부분의 경우 이미 존재)
     result = await db.execute(
         select(Conversation).where(Conversation.id == conv_uuid)
     )
     conv = result.scalar_one_or_none()
+    if conv is not None:
+        return conv
 
-    if conv is None:
-        user_uuid = await ensure_anonymous_user(db)
+    # 없으면 UPSERT로 안전하게 생성
+    user_uuid = await ensure_anonymous_user(db)
+    now = datetime.utcnow()
 
-        conv = Conversation(
-            id=conv_uuid,
-            user_id=user_uuid,
-            title=None,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
-        )
-        db.add(conv)
-        await db.flush()
+    stmt = pg_insert(Conversation).values(
+        id=conv_uuid,
+        user_id=user_uuid,
+        title=None,
+        created_at=now,
+        updated_at=now,
+    ).on_conflict_do_nothing(index_elements=["id"])
+    await db.execute(stmt)
+    await db.flush()
 
-    return conv
+    # INSERT 성공 또는 충돌 무시 후, 확정된 행을 다시 조회
+    result = await db.execute(
+        select(Conversation).where(Conversation.id == conv_uuid)
+    )
+    return result.scalar_one()
 
 
 async def save_user_message(
@@ -200,10 +212,13 @@ async def process_user_message(
             emotion_tag=emotion or None,
         )
 
-    # 6. 대화 제목 자동 생성 (첫 메시지일 때)
-    if conv.title is None:
-        conv.title = content[:50] + ("..." if len(content) > 50 else "")
-        conv.updated_at = datetime.utcnow()
+    # 6. 대화 제목 자동 생성 (첫 메시지 — atomic UPDATE로 경쟁 방지)
+    title_text = content[:50] + ("..." if len(content) > 50 else "")
+    await db.execute(
+        sa_update(Conversation)
+        .where(Conversation.id == conv.id, Conversation.title.is_(None))
+        .values(title=title_text, updated_at=datetime.utcnow())
+    )
 
     await db.commit()
     return responses

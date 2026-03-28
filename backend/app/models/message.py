@@ -16,7 +16,7 @@ class Message(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     conversation_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("conversations.id"), nullable=False, index=True
+        ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False, index=True
     )
     sender_type: Mapped[str] = mapped_column(String(10), nullable=False)
     agent_id: Mapped[str | None] = mapped_column(ForeignKey("agents.id"))

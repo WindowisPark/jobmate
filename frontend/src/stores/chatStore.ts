@@ -17,6 +17,7 @@ interface ChatState {
 
   setActiveRoom: (roomId: string) => void;
   addMessage: (roomId: string, msg: ChatMessage) => void;
+  prependMessages: (roomId: string, msgs: ChatMessage[]) => void;
   appendToLastMessage: (agentId: AgentId, chunk: string) => void;
   finalizeMessage: (agentId: AgentId) => void;
   setTyping: (agentId: AgentId, isTyping: boolean) => void;
@@ -43,6 +44,14 @@ export const useChatStore = create<ChatState>((set) => ({
       const prev = state.messages[roomId] ?? [];
       return {
         messages: { ...state.messages, [roomId]: [...prev, msg] },
+      };
+    }),
+
+  prependMessages: (roomId, msgs) =>
+    set((state) => {
+      const prev = state.messages[roomId] ?? [];
+      return {
+        messages: { ...state.messages, [roomId]: [...msgs, ...prev] },
       };
     }),
 

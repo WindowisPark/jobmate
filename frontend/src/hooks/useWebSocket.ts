@@ -2,10 +2,19 @@ import { useCallback, useEffect, useRef } from "react";
 import { useChatStore } from "@/stores/chatStore";
 import { useOfficeStore } from "@/stores/officeStore";
 import type { AgentId } from "@/types/agent";
+import { toast } from "@/stores/toastStore";
 import { WS_BASE_URL } from "@/utils/constants";
 
 const MAX_RECONNECT_ATTEMPTS = 5;
 const BASE_RECONNECT_DELAY = 1000; // ms
+const MAX_QUEUE_SIZE = 50;
+
+interface QueuedMessage {
+  content: string;
+  mode: "group" | "dm";
+  targetAgent?: string;
+  timestamp: string;
+}
 
 export function useWebSocket(roomId: string) {
   const wsRef = useRef<WebSocket | null>(null);
@@ -14,6 +23,7 @@ export function useWebSocket(roomId: string) {
   const reconnectAttemptsRef = useRef(0);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const unmountedRef = useRef(false);
+  const messageQueueRef = useRef<QueuedMessage[]>([]);
   roomIdRef.current = roomId;
 
   const addMessage = useChatStore((s) => s.addMessage);
@@ -21,6 +31,21 @@ export function useWebSocket(roomId: string) {
   const sendToDesk = useOfficeStore((s) => s.sendToDesk);
   const startTyping = useOfficeStore((s) => s.startTyping);
   const finishTyping = useOfficeStore((s) => s.finishTyping);
+
+  const flushQueue = useCallback((ws: WebSocket) => {
+    while (messageQueueRef.current.length > 0 && ws.readyState === WebSocket.OPEN) {
+      const msg = messageQueueRef.current.shift()!;
+      ws.send(
+        JSON.stringify({
+          type: "user_message",
+          content: msg.content,
+          mode: msg.mode,
+          target_agent: msg.targetAgent,
+          timestamp: msg.timestamp,
+        })
+      );
+    }
+  }, []);
 
   const connect = useCallback(() => {
     if (connectingRef.current || unmountedRef.current) return;
@@ -35,6 +60,9 @@ export function useWebSocket(roomId: string) {
       wsRef.current = ws;
       connectingRef.current = false;
       reconnectAttemptsRef.current = 0;
+
+      // 재연결 시 큐에 쌓인 메시지 전송
+      flushQueue(ws);
     };
 
     ws.onmessage = (event) => {
@@ -78,7 +106,7 @@ export function useWebSocket(roomId: string) {
           break;
 
         case "error":
-          console.error("Server error:", data.message);
+          toast.error(data.message || "서버 오류가 발생했습니다");
           break;
       }
     };
@@ -103,11 +131,12 @@ export function useWebSocket(roomId: string) {
     };
 
     return ws;
-  }, [addMessage, setTyping, sendToDesk, startTyping, finishTyping]);
+  }, [addMessage, setTyping, sendToDesk, startTyping, finishTyping, flushQueue]);
 
   useEffect(() => {
     unmountedRef.current = false;
     reconnectAttemptsRef.current = 0;
+    messageQueueRef.current = [];
     const ws = connect();
 
     return () => {
@@ -122,18 +151,28 @@ export function useWebSocket(roomId: string) {
 
   const sendMessage = useCallback(
     (content: string, mode: "group" | "dm", targetAgent?: string) => {
+      const msg: QueuedMessage = {
+        content,
+        mode,
+        targetAgent,
+        timestamp: new Date().toISOString(),
+      };
+
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send(
           JSON.stringify({
             type: "user_message",
-            content,
-            mode,
-            target_agent: targetAgent,
-            timestamp: new Date().toISOString(),
+            content: msg.content,
+            mode: msg.mode,
+            target_agent: msg.targetAgent,
+            timestamp: msg.timestamp,
           })
         );
       } else {
-        console.warn("WebSocket not connected, attempting reconnect...");
+        // 연결 끊김 시 큐에 저장 후 재연결 시도
+        if (messageQueueRef.current.length < MAX_QUEUE_SIZE) {
+          messageQueueRef.current.push(msg);
+        }
         reconnectAttemptsRef.current = 0;
         connect();
       }

@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { AGENTS } from "@/types/agent";
 import type { AgentId } from "@/types/agent";
 import { useChatStore } from "@/stores/chatStore";
@@ -11,6 +12,46 @@ interface Props {
 export function AgentProfileModal({ agentId, onClose }: Props) {
   const agent = AGENTS[agentId];
   const setActiveRoom = useChatStore((s) => s.setActiveRoom);
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  // Escape 키로 닫기 + 포커스 트랩
+  useEffect(() => {
+    const prevFocus = document.activeElement as HTMLElement | null;
+    modalRef.current?.focus();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+
+      // 포커스 트랩
+      if (e.key === "Tab" && modalRef.current) {
+        const focusable = modalRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (!first || !last) return;
+
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      prevFocus?.focus();
+    };
+  }, [onClose]);
 
   const handleDM = () => {
     setActiveRoom(`dm-${agentId}`);
@@ -30,15 +71,22 @@ export function AgentProfileModal({ agentId, onClose }: Props) {
         animation: "fadeIn 0.2s ease",
       }}
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${agent.name} 프로필`}
     >
       <div
+        ref={modalRef}
+        tabIndex={-1}
         style={{
           background: "var(--bg-hover)",
           borderRadius: 16,
           width: 380,
+          maxWidth: "90vw",
           overflow: "hidden",
           boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
           animation: "slideUp 0.25s ease",
+          outline: "none",
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -96,7 +144,7 @@ export function AgentProfileModal({ agentId, onClose }: Props) {
               lineHeight: 1.5,
             }}
           >
-            "{agent.greeting}"
+            &ldquo;{agent.greeting}&rdquo;
           </div>
 
           {/* Skills */}

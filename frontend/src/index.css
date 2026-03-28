@@ -109,3 +109,14 @@ body {
   0% { background-position: -200px 0; }
   100% { background-position: 200px 0; }
 }
+
+/* === Responsive === */
+@media (max-width: 768px) {
+  :root {
+    --sidebar-width: 280px;
+  }
+
+  body {
+    overflow: auto;
+  }
+}

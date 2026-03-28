@@ -1,3 +1,4 @@
+import { toast } from "@/stores/toastStore";
 import { API_BASE_URL } from "./constants";
 
 const FETCH_TIMEOUT = 15_000; // 15 seconds
@@ -39,8 +40,10 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
     });
   } catch (err: any) {
     if (err.name === "AbortError") {
+      toast.error("요청 시간이 초과되었습니다");
       throw new Error("요청 시간이 초과되었습니다");
     }
+    toast.error("서버에 연결할 수 없습니다");
     throw new Error("서버에 연결할 수 없습니다");
   } finally {
     clearTimeout(timer);
@@ -69,7 +72,9 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(body.detail || `API Error: ${response.status}`);
+    const message = body.detail || `API Error: ${response.status}`;
+    toast.error(message);
+    throw new Error(message);
   }
 
   return response.json() as Promise<T>;

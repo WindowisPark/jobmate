@@ -10,9 +10,10 @@ import styles from "./Sidebar.module.css";
 
 interface Props {
   onAgentProfileClick?: (agentId: string) => void;
+  onRoomSelect?: () => void;
 }
 
-export function Sidebar({ onAgentProfileClick }: Props) {
+export function Sidebar({ onAgentProfileClick, onRoomSelect }: Props) {
   const navigate = useNavigate();
   const officeAgents = useOfficeStore((s) => s.agents);
   const { rooms, activeRoomId, setActiveRoom, messages } = useChatStore();
@@ -33,7 +34,7 @@ export function Sidebar({ onAgentProfileClick }: Props) {
   const dms = rooms.filter((r) => r.type === "dm");
 
   return (
-    <aside className={styles.sidebar}>
+    <aside className={styles.sidebar} role="navigation" aria-label="사이드바 네비게이션">
       {/* Header */}
       <div className={styles.header}>
         <span className={styles.logo}>JobMate</span>
@@ -48,7 +49,7 @@ export function Sidebar({ onAgentProfileClick }: Props) {
         <div
           key={room.id}
           className={`${styles.roomItem} ${activeRoomId === room.id ? styles.active : ""}`}
-          onClick={() => setActiveRoom(room.id)}
+          onClick={() => { setActiveRoom(room.id); onRoomSelect?.(); }}
           onMouseEnter={() => setHoveredRoom(room.id)}
           onMouseLeave={() => setHoveredRoom(null)}
         >
@@ -75,7 +76,7 @@ export function Sidebar({ onAgentProfileClick }: Props) {
           <div
             key={room.id}
             className={`${styles.dmItem} ${isSelected ? styles.active : ""}`}
-            onClick={() => setActiveRoom(room.id)}
+            onClick={() => { setActiveRoom(room.id); onRoomSelect?.(); }}
             onMouseEnter={() => setHoveredRoom(room.id)}
             onMouseLeave={() => setHoveredRoom(null)}
           >

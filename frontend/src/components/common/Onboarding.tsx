@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { AGENTS, AGENT_IDS } from "@/types/agent";
+import { AgentAvatar } from "@/components/common/AgentAvatar";
 
 interface Props {
   onComplete: () => void;
@@ -42,7 +43,9 @@ export function Onboarding({ onComplete }: Props) {
               onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.02)")}
               onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
             >
-              <div style={{ fontSize: 28, marginBottom: 8 }}>{agent.emoji}</div>
+              <div style={{ marginBottom: 8 }}>
+                <AgentAvatar agentId={id} size={40} />
+              </div>
               <div style={{ color: agent.color, fontWeight: 700, fontSize: 16, marginBottom: 2 }}>
                 {agent.name}
               </div>

@@ -115,7 +115,11 @@ export function ChatRoom() {
       {/* Mention + Input */}
       <div style={{ position: "relative" }}>
         {showMention && (
-          <MentionPopup filter={mentionFilter} onSelect={handleMentionSelect} />
+          <MentionPopup
+            filter={mentionFilter}
+            onSelect={handleMentionSelect}
+            onClose={() => setShowMention(false)}
+          />
         )}
         <MessageInput
           value={input}

@@ -4,12 +4,14 @@ import re
 import traceback
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from sqlalchemy import update as sa_update
 from starlette.websockets import WebSocketState
 
 from app.agents.graph import build_graph
 from app.agents.profiles import AGENT_PROFILES
 from app.api.middleware.auth import get_ws_user_id
 from app.dependencies import async_session
+from app.models.conversation import Conversation
 from app.services.chat_service import (
     get_or_create_conversation,
     load_conversation_history,
@@ -94,85 +96,87 @@ async def websocket_chat(websocket: WebSocket, conversation_id: str) -> None:
 
                 logger.info(f"Message: {user_message[:50]} | mode={chat_mode} | mentions={mentioned_agents}")
 
-                # --- DB 영속화 ---
+                # --- Phase 1: 유저 메시지 저장 (짧은 트랜잭션) ---
                 async with async_session() as db:
-                    try:
-                        conv = await get_or_create_conversation(
-                            db, conversation_id, user_id=user_id_str
+                    conv = await get_or_create_conversation(
+                        db, conversation_id, user_id=user_id_str
+                    )
+                    conv_id = conv.id
+                    history = await load_conversation_history(db, conv_id)
+                    await save_user_message(db, conv_id, user_message)
+                    await db.commit()
+
+                # --- Phase 2: LangGraph 실행 (트랜잭션 외부) ---
+                try:
+                    result = await asyncio.wait_for(
+                        graph.ainvoke({
+                            "messages": [],
+                            "user_message": user_message,
+                            "conversation_history": history,
+                            "emotion": "",
+                            "emotion_intensity": 0,
+                            "intent": "",
+                            "active_agents": [],
+                            "agent_responses": [],
+                            "conversation_id": conversation_id,
+                            "user_id": user_id_str,
+                        }),
+                        timeout=GRAPH_TIMEOUT,
+                    )
+                except asyncio.TimeoutError:
+                    logger.error(f"Graph execution timed out ({GRAPH_TIMEOUT}s)")
+                    await _safe_send(websocket, {
+                        "type": "error",
+                        "message": "응답 생성 시간이 초과되었습니다. 다시 시도해주세요.",
+                    })
+                    continue
+
+                responses = result.get("agent_responses", [])
+                emotion = result.get("emotion", "")
+                logger.info(f"Graph returned {len(responses)} responses: {[r['agent_id'] for r in responses]}")
+
+                # DM 모드
+                if chat_mode == "dm" and target_agent:
+                    responses = [r for r in responses if r["agent_id"] == target_agent]
+                    if not responses:
+                        module = _AGENT_MODULES.get(target_agent)
+                        if module:
+                            resp = await module.run(result, is_primary=True)
+                            responses = [resp]
+
+                # @멘션 모드
+                elif mentioned_agents:
+                    filtered = [r for r in responses if r["agent_id"] in mentioned_agents]
+                    responded_ids = {r["agent_id"] for r in filtered}
+                    for agent_id in mentioned_agents:
+                        if agent_id not in responded_ids:
+                            module = _AGENT_MODULES.get(agent_id)
+                            if module:
+                                resp = await module.run(result, is_primary=len(filtered) == 0)
+                                filtered.append(resp)
+                    responses = filtered
+
+                # --- Phase 3: 에이전트 응답 저장 (별도 트랜잭션) ---
+                async with async_session() as db:
+                    for resp in responses:
+                        await save_agent_message(
+                            db,
+                            conv_id,
+                            agent_id=resp["agent_id"],
+                            content=resp["content"],
+                            tool_calls=resp.get("tool_calls"),
+                            emotion_tag=emotion or None,
                         )
-                        history = await load_conversation_history(db, conv.id)
-                        await save_user_message(db, conv.id, user_message)
 
-                        # LangGraph 실행 (타임아웃 적용)
-                        result = await asyncio.wait_for(
-                            graph.ainvoke({
-                                "messages": [],
-                                "user_message": user_message,
-                                "conversation_history": history,
-                                "emotion": "",
-                                "emotion_intensity": 0,
-                                "intent": "",
-                                "active_agents": [],
-                                "agent_responses": [],
-                                "conversation_id": conversation_id,
-                                "user_id": user_id_str,
-                            }),
-                            timeout=GRAPH_TIMEOUT,
-                        )
+                    # 대화 제목 자동 생성 (첫 메시지 — atomic UPDATE로 경쟁 방지)
+                    title_text = user_message[:50] + ("..." if len(user_message) > 50 else "")
+                    await db.execute(
+                        sa_update(Conversation)
+                        .where(Conversation.id == conv_id, Conversation.title.is_(None))
+                        .values(title=title_text)
+                    )
 
-                        responses = result.get("agent_responses", [])
-                        emotion = result.get("emotion", "")
-                        logger.info(f"Graph returned {len(responses)} responses: {[r['agent_id'] for r in responses]}")
-
-                        # DM 모드
-                        if chat_mode == "dm" and target_agent:
-                            responses = [r for r in responses if r["agent_id"] == target_agent]
-                            if not responses:
-                                module = _AGENT_MODULES.get(target_agent)
-                                if module:
-                                    resp = await module.run(result, is_primary=True)
-                                    responses = [resp]
-
-                        # @멘션 모드
-                        elif mentioned_agents:
-                            filtered = [r for r in responses if r["agent_id"] in mentioned_agents]
-                            responded_ids = {r["agent_id"] for r in filtered}
-                            for agent_id in mentioned_agents:
-                                if agent_id not in responded_ids:
-                                    module = _AGENT_MODULES.get(agent_id)
-                                    if module:
-                                        resp = await module.run(result, is_primary=len(filtered) == 0)
-                                        filtered.append(resp)
-                            responses = filtered
-
-                        # 에이전트 응답 DB 저장
-                        for resp in responses:
-                            await save_agent_message(
-                                db,
-                                conv.id,
-                                agent_id=resp["agent_id"],
-                                content=resp["content"],
-                                tool_calls=resp.get("tool_calls"),
-                                emotion_tag=emotion or None,
-                            )
-
-                        if conv.title is None:
-                            conv.title = user_message[:50] + ("..." if len(user_message) > 50 else "")
-
-                        await db.commit()
-
-                    except asyncio.TimeoutError:
-                        await db.rollback()
-                        logger.error(f"Graph execution timed out ({GRAPH_TIMEOUT}s)")
-                        await _safe_send(websocket, {
-                            "type": "error",
-                            "message": "응답 생성 시간이 초과되었습니다. 다시 시도해주세요.",
-                        })
-                        continue
-
-                    except Exception:
-                        await db.rollback()
-                        raise
+                    await db.commit()
 
                 logger.info(f"Sending {len(responses)} responses")
 

@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.agents.graph import build_graph
 from app.agents.state import JobMateState
 from app.models.conversation import Conversation
+from app.models.job_preference import JobPreference
 from app.models.message import Message
 from app.models.user import User
 
@@ -166,6 +167,33 @@ async def load_conversation_history(
     return history
 
 
+async def load_user_preferences(db: AsyncSession, user_id: str) -> dict | None:
+    """사용자의 활성 직무 프리퍼런스를 로드한다."""
+    try:
+        user_uuid = uuid.UUID(user_id)
+    except ValueError:
+        return None
+
+    result = await db.execute(
+        select(JobPreference)
+        .where(JobPreference.user_id == user_uuid, JobPreference.is_active.is_(True))
+        .order_by(JobPreference.updated_at.desc())
+        .limit(1)
+    )
+    pref = result.scalar_one_or_none()
+    if not pref:
+        return None
+
+    return {
+        "job_field": pref.job_field,
+        "location": pref.location,
+        "career_level": pref.career_level,
+        "keywords": pref.keywords or [],
+        "salary_min": pref.salary_min,
+        "company_size": pref.company_size,
+    }
+
+
 async def process_user_message(
     db: AsyncSession,
     user_id: str,
@@ -179,10 +207,13 @@ async def process_user_message(
     # 2. 이전 대화 히스토리 로드
     history = await load_conversation_history(db, conv.id)
 
-    # 3. 사용자 메시지 저장
+    # 3. 사용자 프리퍼런스 로드
+    preferences = await load_user_preferences(db, user_id)
+
+    # 4. 사용자 메시지 저장
     await save_user_message(db, conv.id, content)
 
-    # 4. LangGraph 실행
+    # 5. LangGraph 실행
     graph = build_graph()
     initial_state: JobMateState = {
         "messages": [],
@@ -195,6 +226,11 @@ async def process_user_message(
         "agent_responses": [],
         "conversation_id": str(conv.id),
         "user_id": user_id,
+        "user_preferences": preferences,
+        "emotion_history_summary": "",
+        "task_plan": [],
+        "step_results": {},
+        "current_step": 0,
     }
 
     result = await graph.ainvoke(initial_state)

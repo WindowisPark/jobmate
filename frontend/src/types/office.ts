@@ -23,14 +23,56 @@ export type TileType =
 
 // 에이전트 행동 상태
 export type AgentBehavior =
-  | "wandering"     // 랜덤 돌아다님
-  | "walking_to_desk" // 책상으로 이동 중
-  | "sitting_down"  // 앉는 중
-  | "typing"        // 타이핑 중 (응답 생성)
-  | "standing_up"   // 일어나는 중
-  | "idle_at_spot"  // 한 곳에서 잠시 멈춤
-  | "drinking"      // 커피머신 근처
-  | "chatting";     // 소파 근처에서 잡담
+  | "wandering"        // 랜덤 돌아다님
+  | "walking_to"       // 목표 위치로 이동 중
+  | "walking_to_desk"  // 책상으로 이동 중 (하위 호환)
+  | "typing"           // 타이핑 중 (응답 생성)
+  | "searching"        // 책상에서 검색 중 (모니터 파란 맥동)
+  | "analyzing"        // 화이트보드에서 분석 중
+  | "reading"          // 책상에서 서류 검토
+  | "breathing"        // 소파에서 호흡 운동
+  | "interview_prep"   // 화이트보드 앞 면접 준비
+  | "collaborating"    // 다른 에이전트와 협업
+  | "idle_at_spot"     // 한 곳에서 잠시 멈춤
+  | "drinking"         // 커피머신 근처
+  | "chatting";        // 소파 근처에서 잡담
+
+// 오피스 내 주요 위치
+export type OfficeLocation = "desk" | "whiteboard" | "sofa" | "coffee" | "center";
+
+// 도구 → 행동 + 위치 매핑
+export const TOOL_BEHAVIOR_MAP: Record<string, { behavior: AgentBehavior; location: OfficeLocation }> = {
+  search_jobs:           { behavior: "searching",      location: "desk" },
+  analyze_market:        { behavior: "analyzing",      location: "whiteboard" },
+  resume_feedback:       { behavior: "reading",        location: "desk" },
+  mock_interview:        { behavior: "interview_prep", location: "whiteboard" },
+  breathing_exercise:    { behavior: "breathing",      location: "sofa" },
+  get_motivation_content:{ behavior: "searching",      location: "desk" },
+  industry_insight:      { behavior: "analyzing",      location: "whiteboard" },
+  schedule_routine:      { behavior: "typing",         location: "desk" },
+  save_job_preferences:  { behavior: "typing",         location: "desk" },
+};
+
+// 주요 위치 좌표 (타일 단위)
+export const OFFICE_LOCATIONS: Record<OfficeLocation, { col: number; row: number }> = {
+  whiteboard: { col: 6, row: 3 },
+  sofa:       { col: 5, row: 4 },
+  coffee:     { col: 7, row: 7 },
+  center:     { col: 6, row: 5 },
+  desk:       { col: 0, row: 0 }, // 각 에이전트의 deskTile 사용
+};
+
+// 오피스 액션 문자열 → AgentBehavior 변환
+export const ACTION_TO_BEHAVIOR: Record<string, AgentBehavior> = {
+  typing:         "typing",
+  searching:      "searching",
+  analyzing:      "analyzing",
+  reading:        "reading",
+  breathing:      "breathing",
+  interview_prep: "interview_prep",
+  thinking:       "typing",
+  idle:           "wandering",
+};
 
 export interface AgentOfficeFull {
   id: AgentId;

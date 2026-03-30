@@ -28,9 +28,12 @@ export function useWebSocket(roomId: string) {
 
   const addMessage = useChatStore((s) => s.addMessage);
   const setTyping = useChatStore((s) => s.setTyping);
+  const addToolResult = useChatStore((s) => s.addToolResult);
   const sendToDesk = useOfficeStore((s) => s.sendToDesk);
   const startTyping = useOfficeStore((s) => s.startTyping);
   const finishTyping = useOfficeStore((s) => s.finishTyping);
+  const setAgentBehavior = useOfficeStore((s) => s.setAgentBehavior);
+  const setEmotion = useOfficeStore((s) => s.setEmotion);
 
   const flushQueue = useCallback((ws: WebSocket) => {
     while (messageQueueRef.current.length > 0 && ws.readyState === WebSocket.OPEN) {
@@ -79,9 +82,15 @@ export function useWebSocket(roomId: string) {
       switch (data.type) {
         case "agent_typing": {
           const agentId = data.agent_id as AgentId;
+          const action = data.office_action || "typing";
           setTyping(agentId, true);
-          sendToDesk(agentId);
-          setTimeout(() => startTyping(agentId), 800);
+          // 실제 동작에 연동된 행동 설정
+          if (setAgentBehavior) {
+            setAgentBehavior(agentId, action);
+          } else {
+            sendToDesk(agentId);
+            setTimeout(() => startTyping(agentId), 800);
+          }
           break;
         }
 
@@ -102,7 +111,21 @@ export function useWebSocket(roomId: string) {
           break;
         }
 
+        case "tool_result": {
+          const agentId = data.agent_id as AgentId;
+          addToolResult(currentRoom, {
+            agentId,
+            toolName: data.tool_name,
+            data: data.data || {},
+            timestamp: new Date().toISOString(),
+          });
+          break;
+        }
+
         case "office_state":
+          if (data.emotion && setEmotion) {
+            setEmotion(data.emotion);
+          }
           break;
 
         case "error":
@@ -131,7 +154,7 @@ export function useWebSocket(roomId: string) {
     };
 
     return ws;
-  }, [addMessage, setTyping, sendToDesk, startTyping, finishTyping, flushQueue]);
+  }, [addMessage, setTyping, addToolResult, sendToDesk, startTyping, finishTyping, setAgentBehavior, setEmotion, flushQueue]);
 
   useEffect(() => {
     unmountedRef.current = false;

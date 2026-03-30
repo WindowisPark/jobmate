@@ -9,11 +9,19 @@ export type ChatRoom = {
   agentId?: AgentId; // DM일 때 대상 에이전트
 };
 
+export interface ToolResult {
+  agentId: AgentId;
+  toolName: string;
+  data: Record<string, unknown>;
+  timestamp: string;
+}
+
 interface ChatState {
   rooms: ChatRoom[];
   activeRoomId: string;
   messages: Record<string, ChatMessage[]>; // roomId → messages
   typingAgents: AgentId[];
+  toolResults: Record<string, ToolResult[]>; // roomId → tool results
 
   setActiveRoom: (roomId: string) => void;
   addMessage: (roomId: string, msg: ChatMessage) => void;
@@ -21,6 +29,7 @@ interface ChatState {
   appendToLastMessage: (agentId: AgentId, chunk: string) => void;
   finalizeMessage: (agentId: AgentId) => void;
   setTyping: (agentId: AgentId, isTyping: boolean) => void;
+  addToolResult: (roomId: string, result: ToolResult) => void;
 }
 
 const DEFAULT_ROOMS: ChatRoom[] = [
@@ -36,6 +45,7 @@ export const useChatStore = create<ChatState>((set) => ({
   activeRoomId: "general",
   messages: {},
   typingAgents: [],
+  toolResults: {},
 
   setActiveRoom: (roomId) => set({ activeRoomId: roomId }),
 
@@ -86,5 +96,13 @@ export const useChatStore = create<ChatState>((set) => ({
         ? [...state.typingAgents.filter((id) => id !== agentId), agentId]
         : state.typingAgents.filter((id) => id !== agentId);
       return { typingAgents: next };
+    }),
+
+  addToolResult: (roomId, result) =>
+    set((state) => {
+      const prev = state.toolResults[roomId] ?? [];
+      return {
+        toolResults: { ...state.toolResults, [roomId]: [...prev, result] },
+      };
     }),
 }));

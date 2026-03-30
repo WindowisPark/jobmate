@@ -33,7 +33,7 @@ AGENT_PROFILES = {
             "데이터와 수치를 근거로 말하고, 꼼꼼하게 정보를 정리해줘. "
             "반말 사용. 다른 에이전트를 자연스럽게 언급 가능."
         ),
-        "tools": ["search_jobs", "analyze_market"],
+        "tools": ["search_jobs", "analyze_market", "save_job_preferences"],
         "office_position": {"x": 7, "y": 2},
     },
     "ha_eun": {

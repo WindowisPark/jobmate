@@ -1,9 +1,11 @@
 import { create } from "zustand";
 import type { AgentId } from "@/types/agent";
-import type { AgentBehavior, AgentOfficeFull } from "@/types/office";
+import type { AgentBehavior, AgentOfficeFull, OfficeLocation } from "@/types/office";
 import {
   TILE_SIZE,
   AGENT_DESK_POSITIONS,
+  OFFICE_LOCATIONS,
+  ACTION_TO_BEHAVIOR,
 } from "@/types/office";
 
 function randomWalkableSpot(): { x: number; y: number } {
@@ -34,23 +36,55 @@ function initAgent(id: AgentId): AgentOfficeFull {
   };
 }
 
+/** 행동에 맞는 목표 위치를 계산한다 */
+function getTargetForBehavior(
+  agent: AgentOfficeFull,
+  behavior: AgentBehavior,
+  location?: OfficeLocation
+): { x: number; y: number } {
+  const loc = location || "desk";
+
+  if (loc === "desk" || behavior === "typing" || behavior === "searching" || behavior === "reading") {
+    return { x: agent.chairTile.col * TILE_SIZE, y: agent.chairTile.row * TILE_SIZE };
+  }
+
+  const coords = OFFICE_LOCATIONS[loc];
+  if (coords && coords.col > 0) {
+    return { x: coords.col * TILE_SIZE, y: coords.row * TILE_SIZE };
+  }
+
+  return { x: agent.chairTile.col * TILE_SIZE, y: agent.chairTile.row * TILE_SIZE };
+}
+
+// 정적 행동 (도착 후 이동하지 않는 행동들)
+const STATIONARY_BEHAVIORS = new Set<AgentBehavior>([
+  "typing", "searching", "analyzing", "reading", "breathing",
+  "interview_prep", "collaborating", "idle_at_spot",
+]);
+
 interface OfficeStoreState {
   agents: Record<AgentId, AgentOfficeFull>;
-  // WebSocket에서 호출: 에이전트를 책상으로 보냄
+  currentEmotion: string;
+
+  // 새로운 통합 행동 설정 (Phase 4)
+  setAgentBehavior: (agentId: AgentId, action: string, location?: OfficeLocation) => void;
+  setEmotion: (emotion: string) => void;
+
+  // 기존 인터페이스 (하위 호환)
   sendToDesk: (agentId: AgentId) => void;
-  // WebSocket에서 호출: 에이전트 타이핑 시작
   startTyping: (agentId: AgentId) => void;
-  // WebSocket에서 호출: 에이전트 응답 완료 → 돌아다님
   finishTyping: (agentId: AgentId) => void;
+
   // 애니메이션 틱
   tick: () => void;
+
   // 하위 호환
   setAgentState: (agentId: AgentId, state: { action?: string }) => void;
   setAllAgentStates: (states: Record<string, { action: string; position: { x: number; y: number } }>) => void;
 }
 
 const MOVE_SPEED = 1.5;
-const WANDER_INTERVAL = 3000; // ms
+const WANDER_INTERVAL = 3000;
 let lastWanderTime = 0;
 
 export const useOfficeStore = create<OfficeStoreState>((set, get) => ({
@@ -60,6 +94,36 @@ export const useOfficeStore = create<OfficeStoreState>((set, get) => ({
     ha_eun: initAgent("ha_eun"),
     min_su: initAgent("min_su"),
   },
+  currentEmotion: "neutral",
+
+  setAgentBehavior: (agentId, action, location) =>
+    set((state) => {
+      const agent = state.agents[agentId];
+      const behavior = ACTION_TO_BEHAVIOR[action] || "typing";
+      const target = getTargetForBehavior(agent, behavior, location);
+
+      return {
+        agents: {
+          ...state.agents,
+          [agentId]: {
+            ...agent,
+            behavior: "walking_to" as AgentBehavior,
+            targetX: target.x,
+            targetY: target.y,
+            // 도착 후 전환할 행동을 frameIndex에 임시 저장하지 않고,
+            // _pendingBehavior를 별도 관리하기 어려우므로
+            // walking_to 도착 시 tick에서 판단
+          },
+        },
+        // _pendingBehaviors를 state에 넣는 대신, behavior 이름으로 판단
+        _pendingBehaviors: {
+          ...(state as any)._pendingBehaviors,
+          [agentId]: behavior,
+        },
+      } as any;
+    }),
+
+  setEmotion: (emotion) => set({ currentEmotion: emotion }),
 
   sendToDesk: (agentId) =>
     set((state) => {
@@ -110,13 +174,18 @@ export const useOfficeStore = create<OfficeStoreState>((set, get) => ({
             targetY: spot.y,
           },
         },
-      };
+        _pendingBehaviors: {
+          ...(state as any)._pendingBehaviors,
+          [agentId]: undefined,
+        },
+      } as any;
     }),
 
   tick: () =>
     set((state) => {
       const now = Date.now();
       const newAgents = { ...state.agents };
+      const pending = { ...((state as any)._pendingBehaviors || {}) };
 
       for (const id of Object.keys(newAgents) as AgentId[]) {
         const agent = { ...newAgents[id]! };
@@ -125,8 +194,8 @@ export const useOfficeStore = create<OfficeStoreState>((set, get) => ({
         // 애니메이션 프레임 업데이트
         agent.frameIndex = (agent.frameIndex + 1) % 60;
 
-        if (agent.behavior === "typing") {
-          // 타이핑 중이면 움직이지 않음
+        // 정적 행동 중이면 이동 안함
+        if (STATIONARY_BEHAVIORS.has(agent.behavior)) {
           continue;
         }
 
@@ -141,7 +210,6 @@ export const useOfficeStore = create<OfficeStoreState>((set, get) => ({
           agent.x += moveX;
           agent.y += moveY;
 
-          // 방향 결정
           if (Math.abs(dx) > Math.abs(dy)) {
             agent.direction = dx > 0 ? "right" : "left";
           } else {
@@ -154,8 +222,15 @@ export const useOfficeStore = create<OfficeStoreState>((set, get) => ({
 
           if (agent.behavior === "walking_to_desk") {
             agent.behavior = "typing";
+          } else if (agent.behavior === "walking_to") {
+            // pending behavior로 전환
+            const pendingBehavior = pending[id];
+            if (pendingBehavior && STATIONARY_BEHAVIORS.has(pendingBehavior)) {
+              agent.behavior = pendingBehavior;
+            } else {
+              agent.behavior = "typing";
+            }
           } else if (agent.behavior === "wandering") {
-            // 주기적으로 새 목적지 설정
             if (now - lastWanderTime > WANDER_INTERVAL) {
               const spot = randomWalkableSpot();
               agent.targetX = spot.x;
@@ -165,7 +240,6 @@ export const useOfficeStore = create<OfficeStoreState>((set, get) => ({
         }
       }
 
-      // 전체 wander 타이밍
       if (now - lastWanderTime > WANDER_INTERVAL) {
         lastWanderTime = now;
         for (const id of Object.keys(newAgents) as AgentId[]) {
@@ -177,16 +251,15 @@ export const useOfficeStore = create<OfficeStoreState>((set, get) => ({
         }
       }
 
-      return { agents: newAgents };
+      return { agents: newAgents, _pendingBehaviors: pending } as any;
     }),
 
-  // 하위 호환 (WebSocket 이벤트에서 호출)
   setAgentState: (agentId, partial) => {
     const action = partial.action ?? "idle";
-    if (action === "thinking" || action === "talking" || action === "typing") {
-      get().sendToDesk(agentId);
-    } else if (action === "idle") {
+    if (action === "idle") {
       get().finishTyping(agentId);
+    } else {
+      get().setAgentBehavior(agentId, action);
     }
   },
 
@@ -194,9 +267,9 @@ export const useOfficeStore = create<OfficeStoreState>((set, get) => ({
     const store = get();
     for (const [id, s] of Object.entries(states)) {
       if (s.action === "idle") {
-        // 모든 에이전트가 idle이면 finishTyping 처리는 이미 됨
-      } else if (s.action === "talking" || s.action === "typing" || s.action === "thinking") {
-        store.sendToDesk(id as AgentId);
+        store.finishTyping(id as AgentId);
+      } else {
+        store.setAgentBehavior(id as AgentId, s.action);
       }
     }
   },

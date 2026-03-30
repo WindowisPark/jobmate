@@ -1,9 +1,13 @@
 import type { ChatMessage } from "@/types/chat";
 import { AGENTS } from "@/types/agent";
 import { AgentAvatar } from "@/components/common/AgentAvatar";
+import BreathingExercise from "./BreathingExercise";
+import MotivationContent from "./MotivationContent";
+import type { ToolResult } from "@/stores/chatStore";
 
 interface Props {
   message: ChatMessage;
+  toolResults?: ToolResult[];
 }
 
 const AGENT_NAMES = Object.values(AGENTS).map((a) => a.name);
@@ -32,7 +36,18 @@ function renderContent(text: string) {
   });
 }
 
-export function MessageBubble({ message }: Props) {
+function renderToolResult(result: ToolResult) {
+  switch (result.toolName) {
+    case "breathing_exercise":
+      return <BreathingExercise key={result.timestamp} data={result.data} />;
+    case "get_motivation_content":
+      return <MotivationContent key={result.timestamp} data={result.data} />;
+    default:
+      return null;
+  }
+}
+
+export function MessageBubble({ message, toolResults }: Props) {
   const isUser = message.senderType === "user";
   const agent = message.agentId ? AGENTS[message.agentId] : null;
 
@@ -122,6 +137,8 @@ export function MessageBubble({ message }: Props) {
         >
           {renderContent(message.content)}
         </div>
+        {/* 도구 결과 인라인 렌더링 */}
+        {toolResults?.map((tr) => renderToolResult(tr))}
       </div>
     </div>
   );

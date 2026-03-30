@@ -51,9 +51,24 @@ export interface AgentReactionEvent {
   emoji: string;
 }
 
+export interface ToolResultEvent {
+  type: "tool_result";
+  agent_id: AgentId;
+  tool_name: string;
+  data: Record<string, unknown>;
+}
+
+export interface OfficeStateEvent {
+  type: "office_state";
+  agents: Record<string, unknown>;
+  emotion?: string;
+}
+
 export type WSServerEvent =
   | AgentTypingEvent
   | AgentMessageChunk
   | ToolCallStartEvent
   | ToolCallResultEvent
+  | ToolResultEvent
+  | OfficeStateEvent
   | AgentReactionEvent;

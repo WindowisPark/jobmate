@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
-from app.api.routes import auth, chat, rooms, users
+from app.api.routes import auth, chat, jobs, rooms, users
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +50,7 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(rooms.router, prefix="/api/conversations", tags=["conversations"])
+app.include_router(jobs.router, prefix="/api/jobs", tags=["jobs"])
 app.include_router(chat.router, prefix="/ws", tags=["chat"])
 
 

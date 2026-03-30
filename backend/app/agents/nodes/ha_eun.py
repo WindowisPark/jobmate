@@ -26,6 +26,11 @@ async def run(state: JobMateState, is_primary: bool = True) -> AgentResponse:
     ):
         context += "사용자가 매우 힘든 상태야. 공감을 먼저 하고, 호흡 운동을 제안해줘.\n"
 
+    # 감정 이력 요약 주입
+    emotion_summary = state.get("emotion_history_summary", "")
+    if emotion_summary:
+        context += f"\n{emotion_summary}\n"
+
     context += "필요한 경우 도구를 사용해서 정확한 정보를 제공해. 도구 결과를 자연스럽게 설명해줘.\n"
 
     system = profile["system_prompt"] + "\n\n" + context

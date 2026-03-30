@@ -20,7 +20,10 @@ export function MessageList() {
   const [loadingMore, setLoadingMore] = useState(false);
   const prevRoomRef = useRef(activeRoomId);
 
+  const allToolResults = useChatStore((s) => s.toolResults);
+
   const messages = allMessages[activeRoomId] ?? [];
+  const roomToolResults = allToolResults[activeRoomId] ?? [];
   const activeRoom = rooms.find((r) => r.id === activeRoomId);
   const isDM = activeRoom?.type === "dm";
   const agent = isDM && activeRoom?.agentId ? AGENTS[activeRoom.agentId] : null;
@@ -164,9 +167,24 @@ export function MessageList() {
           )}
         </div>
       )}
-      {messages.map((msg) => (
-        <MessageBubble key={msg.id} message={msg} />
-      ))}
+      {messages.map((msg) => {
+        // 에이전트 메시지에 대응하는 도구 결과를 찾는다
+        const msgToolResults = msg.senderType === "agent" && msg.agentId
+          ? roomToolResults.filter(
+              (tr) =>
+                tr.agentId === msg.agentId &&
+                new Date(tr.timestamp).getTime() - new Date(msg.createdAt).getTime() < 5000 &&
+                new Date(tr.timestamp).getTime() >= new Date(msg.createdAt).getTime() - 5000
+            )
+          : [];
+        return (
+          <MessageBubble
+            key={msg.id}
+            message={msg}
+            toolResults={msgToolResults.length > 0 ? msgToolResults : undefined}
+          />
+        );
+      })}
       {typingAgents.map((agentId) => (
         <TypingIndicator key={agentId} agentId={agentId} />
       ))}

@@ -195,6 +195,45 @@ TOOL_SCHEMAS: dict[str, dict] = {
             },
         },
     },
+    "save_job_preferences": {
+        "type": "function",
+        "function": {
+            "name": "save_job_preferences",
+            "description": "사용자의 직무 선호도를 저장합니다. 대화 중 사용자가 관심 직무, 희망 근무지, 경력 수준 등을 언급하면 자동으로 저장합니다.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "job_field": {
+                        "type": "string",
+                        "description": "관심 직무 (예: '백엔드 개발', '데이터 분석', '마케팅')",
+                    },
+                    "location": {
+                        "type": "string",
+                        "description": "희망 근무지 (예: '서울', '경기', '판교')",
+                    },
+                    "career_level": {
+                        "type": "string",
+                        "enum": ["신입", "경력 1-3년", "경력 3-5년", "무관"],
+                        "description": "경력 수준",
+                    },
+                    "keywords": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "관심 키워드 (예: ['Python', 'FastAPI', '스타트업'])",
+                    },
+                    "salary_min": {
+                        "type": "integer",
+                        "description": "희망 최소 연봉 (만원 단위)",
+                    },
+                    "company_size": {
+                        "type": "string",
+                        "enum": ["스타트업", "중소기업", "중견기업", "대기업", "무관"],
+                        "description": "희망 회사 규모",
+                    },
+                },
+            },
+        },
+    },
 }
 
 

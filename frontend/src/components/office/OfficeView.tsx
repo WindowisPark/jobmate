@@ -36,12 +36,24 @@ function drawRoundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: n
   ctx.fill();
 }
 
+// 행동별 말풍선 텍스트
+const BEHAVIOR_LABELS: Record<string, string> = {
+  typing: "타이핑",
+  searching: "검색 중",
+  analyzing: "분석 중",
+  reading: "검토 중",
+  breathing: "호흡 중",
+  interview_prep: "준비 중",
+  collaborating: "협업 중",
+};
+
 function drawCharacter(
   ctx: CanvasRenderingContext2D,
   agentId: AgentId,
   cx: number, cy: number,
   isTyping: boolean, isWalking: boolean,
   frame: number,
+  behavior?: string,
 ) {
   const style = CHAR_STYLE[agentId];
   const profile = AGENTS[agentId];
@@ -210,7 +222,8 @@ function drawCharacter(
     ctx.fillStyle = style.bodyColor;
     ctx.textAlign = "center";
     const dots = "●".repeat((Math.floor(frame / 8) % 3) + 1).padEnd(3, "○");
-    ctx.fillText(`타이핑 ${dots}`, cx, by + 7);
+    const label = (behavior && BEHAVIOR_LABELS[behavior]) || "타이핑";
+    ctx.fillText(`${label} ${dots}`, cx, by + 7);
   }
 }
 
@@ -383,13 +396,110 @@ export function OfficeView() {
         .map((id) => ({ ...agents[id]!, agentId: id }))
         .sort((a, b) => a.y - b.y);
 
+      const stationaryBehaviors = new Set(["typing", "searching", "analyzing", "reading", "breathing", "interview_prep", "collaborating"]);
+
       for (const agent of agentList) {
         const cx = agent.x + TILE_SIZE / 2;
         const cy = agent.y + TILE_SIZE / 2;
-        const isTyping = agent.behavior === "typing";
-        const isWalking = agent.behavior === "wandering" || agent.behavior === "walking_to_desk";
+        const isStationary = stationaryBehaviors.has(agent.behavior);
+        const isTyping = agent.behavior === "typing" || agent.behavior === "searching" || agent.behavior === "reading";
+        const isWalking = !isStationary;
 
-        drawCharacter(ctx, agent.agentId, cx, cy, isTyping, isWalking, frame);
+        drawCharacter(ctx, agent.agentId, cx, cy, isTyping, isWalking, frame, agent.behavior);
+
+        // === 행동별 추가 이펙트 ===
+        const style = CHAR_STYLE[agent.agentId];
+
+        if (agent.behavior === "searching") {
+          // 돋보기 아이콘 떠다님
+          const floatY = Math.sin(frame * 0.1) * 3;
+          ctx.font = "12px sans-serif";
+          ctx.fillStyle = `rgba(97,175,239,${0.5 + Math.sin(frame * 0.08) * 0.3})`;
+          ctx.textAlign = "center";
+          ctx.fillText("🔍", cx + 16, cy - 20 + floatY);
+
+          // 근처 모니터 파란 맥동
+          ctx.fillStyle = `rgba(97,175,239,${0.1 + Math.sin(frame * 0.06) * 0.08})`;
+          ctx.fillRect(agent.deskTile.col * TILE_SIZE, agent.deskTile.row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+        }
+
+        if (agent.behavior === "analyzing" || agent.behavior === "interview_prep") {
+          // 화이트보드 방향 팔 뻗기 효과 (작은 색상 점들)
+          const dotCount = (Math.floor(frame / 15) % 4) + 1;
+          for (let i = 0; i < dotCount; i++) {
+            ctx.fillStyle = `${style.bodyColor}88`;
+            ctx.beginPath();
+            ctx.arc(cx - 10 + i * 8, cy - 30 - i * 3, 2, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          // 집중 이펙트
+          ctx.font = "10px sans-serif";
+          ctx.fillStyle = `rgba(255,255,255,${0.3 + Math.sin(frame * 0.12) * 0.2})`;
+          ctx.textAlign = "center";
+          ctx.fillText("✏️", cx - 14, cy - 16);
+        }
+
+        if (agent.behavior === "breathing") {
+          // 초록 오라 맥동
+          const breathScale = 0.6 + Math.sin(frame * 0.04) * 0.4; // 느린 호흡 주기
+          const auraRadius = 25 * breathScale;
+          const auraAlpha = 0.08 + Math.sin(frame * 0.04) * 0.05;
+          ctx.fillStyle = `rgba(152,195,121,${auraAlpha})`;
+          ctx.beginPath();
+          ctx.arc(cx, cy, auraRadius, 0, Math.PI * 2);
+          ctx.fill();
+          // 두번째 레이어
+          ctx.fillStyle = `rgba(152,195,121,${auraAlpha * 0.5})`;
+          ctx.beginPath();
+          ctx.arc(cx, cy, auraRadius * 1.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        if (agent.behavior === "reading") {
+          // 책상 위 작은 종이 사각형
+          const paperX = agent.deskTile.col * TILE_SIZE + 5;
+          const paperY = agent.deskTile.row * TILE_SIZE + 12;
+          ctx.fillStyle = "rgba(255,255,255,0.15)";
+          ctx.fillRect(paperX, paperY, 10, 13);
+          ctx.fillRect(paperX + 12, paperY + 2, 10, 13);
+          // 텍스트 라인
+          ctx.fillStyle = "rgba(100,100,100,0.3)";
+          for (let i = 0; i < 3; i++) {
+            ctx.fillRect(paperX + 2, paperY + 3 + i * 3, 6, 1);
+          }
+        }
+
+        if (agent.behavior === "collaborating") {
+          // 말풍선 이펙트
+          const bubbleAlpha = 0.3 + Math.sin(frame * 0.1) * 0.2;
+          ctx.fillStyle = `rgba(255,255,255,${bubbleAlpha})`;
+          ctx.font = "10px sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText("💬", cx + 12, cy - 28);
+        }
+      }
+
+      // === 감정 반응형 환경 오버레이 ===
+      const emotion = useOfficeStore.getState().currentEmotion;
+      if (emotion === "anxious" || emotion === "frustrated") {
+        ctx.fillStyle = "rgba(224,108,117,0.03)";
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+      } else if (emotion === "hopeful") {
+        ctx.fillStyle = "rgba(229,192,123,0.03)";
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+        // 미세한 반짝임 파티클
+        for (let i = 0; i < 3; i++) {
+          const px = (frame * 7 + i * 193) % WIDTH;
+          const py = (frame * 3 + i * 137) % HEIGHT;
+          const sparkleAlpha = Math.sin(frame * 0.1 + i) * 0.15 + 0.1;
+          ctx.fillStyle = `rgba(229,192,123,${sparkleAlpha})`;
+          ctx.beginPath();
+          ctx.arc(px, py, 1.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      } else if (emotion === "depressed") {
+        ctx.fillStyle = "rgba(0,0,0,0.06)";
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
       }
 
       // 오피스 테두리 비네팅 효과

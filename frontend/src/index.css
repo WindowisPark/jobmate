@@ -6,45 +6,51 @@
 }
 
 :root {
-  /* Slack-inspired dark theme */
-  --bg-primary: #1a1d21;
-  --bg-secondary: #19171d;
-  --bg-tertiary: #222529;
-  --bg-hover: #2b2d31;
-  --bg-active: #1164a3;
-  --bg-input: #222529;
+  /* Warm mental-care dark theme */
+  --bg-primary: #1b1e24;
+  --bg-secondary: #161920;
+  --bg-tertiary: #232730;
+  --bg-hover: #2a2e38;
+  --bg-active: #2d5a7b;
+  --bg-input: #232730;
+  --bg-card: #1f2330;
 
-  --border: #383a3f;
-  --border-input: #565856;
+  --border: #2e3340;
+  --border-input: #3d4455;
 
-  --text-primary: #d1d2d3;
-  --text-secondary: #9a9b9d;
-  --text-muted: #616061;
-  --text-white: #ffffff;
+  --text-primary: #dce0e8;
+  --text-secondary: #9aa0b0;
+  --text-muted: #5c6270;
+  --text-white: #f0f2f5;
 
-  --accent-green: #007a5a;
-  --accent-blue: #1264a3;
-  --accent-link: #1d9bd1;
-  --online-green: #44b700;
+  --accent-green: #6dae8a;
+  --accent-blue: #5b9bd5;
+  --accent-link: #7eb8e0;
+  --accent-warm: #e8c49a;
+  --online-green: #6dae8a;
 
-  /* Agent colors */
-  --agent-seo-yeon: #e06c75;
-  --agent-jun-ho: #61afef;
-  --agent-ha-eun: #98c379;
-  --agent-min-su: #e5c07b;
+  /* Agent colors (softer) */
+  --agent-seo-yeon: #d98a90;
+  --agent-jun-ho: #7bb5e0;
+  --agent-ha-eun: #8dc07a;
+  --agent-min-su: #dfc07a;
+
+  /* Gradient accents */
+  --gradient-calm: linear-gradient(135deg, #1b2838 0%, #1e2a3a 50%, #1b2530 100%);
+  --gradient-presence: linear-gradient(180deg, #1e2330 0%, #1b1e24 100%);
 
   /* Sizing */
   --sidebar-width: 250px;
   --font-sm: 12px;
   --font-base: 14px;
   --font-lg: 16px;
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
 
   /* Transitions */
   --transition-fast: 0.15s ease;
-  --transition-normal: 0.25s ease;
+  --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 body {
@@ -108,6 +114,16 @@ body {
 @keyframes shimmer {
   0% { background-position: -200px 0; }
   100% { background-position: 200px 0; }
+}
+
+@keyframes breathe {
+  0%, 100% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.15); opacity: 1; }
+}
+
+@keyframes gentleGlow {
+  0%, 100% { box-shadow: 0 0 8px rgba(109, 174, 138, 0.15); }
+  50% { box-shadow: 0 0 16px rgba(109, 174, 138, 0.3); }
 }
 
 /* === Responsive === */

@@ -69,7 +69,8 @@ export function Sidebar({ onAgentProfileClick, onRoomSelect }: Props) {
         const agent = room.agentId ? AGENTS[room.agentId] : null;
         if (!agent) return null;
         const officeState = room.agentId ? officeAgents[room.agentId] : null;
-        const isActive = officeState?.behavior === "typing" || officeState?.behavior === "walking_to_desk";
+        const activeBehaviors = new Set(["typing", "walking_to_desk", "walking_to", "searching", "analyzing", "reading", "breathing", "interview_prep", "collaborating"]);
+        const isActive = officeState ? activeBehaviors.has(officeState.behavior) : false;
         const isSelected = activeRoomId === room.id;
 
         return (

@@ -21,10 +21,10 @@ function renderContent(text: string) {
         <span
           key={i}
           style={{
-            background: "rgba(29,155,209,0.12)",
+            background: "rgba(91,155,213,0.15)",
             color: "var(--accent-link)",
-            padding: "1px 4px",
-            borderRadius: 3,
+            padding: "1px 5px",
+            borderRadius: 4,
             fontWeight: 600,
           }}
         >
@@ -55,27 +55,43 @@ export function MessageBubble({ message, toolResults }: Props) {
     <div
       style={{
         display: "flex",
-        gap: 10,
-        padding: "6px 20px",
-        animation: "fadeIn 0.25s ease",
-        transition: "background 0.15s",
+        gap: 12,
+        padding: isUser ? "10px 20px" : "10px 20px 10px 16px",
+        animation: "fadeIn 0.3s ease",
+        transition: "background var(--transition-fast)",
+        margin: "2px 8px",
+        borderRadius: "var(--radius-md)",
+        ...(isUser
+          ? {}
+          : {
+              background: "var(--bg-card)",
+              borderLeft: `3px solid ${agent?.color ?? "var(--border)"}`,
+            }),
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.02)")}
-      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = isUser
+          ? "rgba(255,255,255,0.02)"
+          : "var(--bg-hover)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = isUser
+          ? "transparent"
+          : "var(--bg-card)";
+      }}
     >
       {/* Avatar */}
       <div style={{ flexShrink: 0, marginTop: 2 }}>
         {isUser ? (
           <div
             style={{
-              width: 36,
-              height: 36,
-              borderRadius: "var(--radius-lg)",
-              background: "var(--accent-blue)",
+              width: 38,
+              height: 38,
+              borderRadius: "var(--radius-md)",
+              background: "linear-gradient(135deg, var(--accent-blue), #4a8abf)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: 13,
+              fontSize: 14,
               fontWeight: 700,
               color: "#fff",
             }}
@@ -83,7 +99,7 @@ export function MessageBubble({ message, toolResults }: Props) {
             나
           </div>
         ) : message.agentId ? (
-          <AgentAvatar agentId={message.agentId} size={36} />
+          <AgentAvatar agentId={message.agentId} size={38} />
         ) : null}
       </div>
 
@@ -94,14 +110,14 @@ export function MessageBubble({ message, toolResults }: Props) {
             display: "flex",
             alignItems: "baseline",
             gap: 8,
-            marginBottom: 3,
+            marginBottom: 4,
           }}
         >
           <span
             style={{
               fontWeight: 700,
-              fontSize: "var(--font-base)",
-              color: isUser ? "var(--text-primary)" : agent?.color,
+              fontSize: 15,
+              color: isUser ? "var(--text-white)" : agent?.color,
             }}
           >
             {isUser ? "나" : agent?.name}
@@ -110,10 +126,11 @@ export function MessageBubble({ message, toolResults }: Props) {
             <span
               style={{
                 fontSize: 11,
-                color: "var(--text-muted)",
-                background: `${agent.color}11`,
-                padding: "1px 6px",
-                borderRadius: 3,
+                color: agent.color,
+                background: `${agent.color}12`,
+                padding: "2px 8px",
+                borderRadius: 10,
+                fontWeight: 500,
               }}
             >
               {agent.role}
@@ -130,14 +147,13 @@ export function MessageBubble({ message, toolResults }: Props) {
           style={{
             color: "var(--text-primary)",
             fontSize: 15,
-            lineHeight: 1.65,
+            lineHeight: 1.7,
             whiteSpace: "pre-wrap",
             wordBreak: "break-word",
           }}
         >
           {renderContent(message.content)}
         </div>
-        {/* 도구 결과 인라인 렌더링 */}
         {toolResults?.map((tr) => renderToolResult(tr))}
       </div>
     </div>

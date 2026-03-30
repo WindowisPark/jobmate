@@ -2,6 +2,8 @@ import { useState } from "react";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { MentionPopup } from "./MentionPopup";
+import { AgentPresenceBar } from "./AgentPresenceBar";
+import { MoodCheckIn } from "./MoodCheckIn";
 import { useChatStore } from "@/stores/chatStore";
 import { AgentAvatar } from "@/components/common/AgentAvatar";
 import { useWebSocket } from "@/hooks/useWebSocket";
@@ -12,6 +14,7 @@ export function ChatRoom() {
   const [input, setInput] = useState("");
   const [showMention, setShowMention] = useState(false);
   const [mentionFilter, setMentionFilter] = useState("");
+  const [moodSelected, setMoodSelected] = useState(false);
   const { activeRoomId, rooms, addMessage } = useChatStore();
   const { sendMessage } = useWebSocket(activeRoomId);
 
@@ -59,6 +62,20 @@ export function ChatRoom() {
     setShowMention(false);
   };
 
+  const handleMoodSelect = (mood: string) => {
+    setMoodSelected(true);
+    // 감정 체크인 결과를 첫 메시지에 자연스럽게 포함
+    const moodContext = `[기분: ${mood}]`;
+    addMessage(activeRoomId, {
+      id: crypto.randomUUID(),
+      conversationId: activeRoomId,
+      senderType: "user",
+      content: moodContext,
+      createdAt: new Date().toISOString(),
+    });
+    sendMessage(moodContext, isDM && activeRoom?.agentId ? "dm" : "group", activeRoom?.agentId);
+  };
+
   return (
     <div
       style={{
@@ -72,26 +89,28 @@ export function ChatRoom() {
       {/* Header */}
       <div
         style={{
-          padding: "10px 20px",
+          padding: "12px 20px",
           borderBottom: "1px solid var(--border)",
           display: "flex",
           alignItems: "center",
           gap: 10,
+          background: "var(--bg-secondary)",
         }}
       >
         {isDM && agent ? (
           <>
-            <AgentAvatar agentId={agent.id} size={24} />
+            <AgentAvatar agentId={agent.id} size={26} />
             <span style={{ color: agent.color, fontWeight: 700, fontSize: "var(--font-lg)" }}>
               {agent.name}
             </span>
             <span
               style={{
-                fontSize: 12,
-                color: "var(--text-secondary)",
-                background: `${agent.color}11`,
-                padding: "2px 8px",
-                borderRadius: 4,
+                fontSize: 11,
+                color: agent.color,
+                background: `${agent.color}12`,
+                padding: "2px 10px",
+                borderRadius: 10,
+                fontWeight: 500,
               }}
             >
               {agent.role}
@@ -110,6 +129,13 @@ export function ChatRoom() {
         )}
       </div>
 
+      {/* Agent Presence Bar */}
+      <AgentPresenceBar />
+
+      {/* Mood Check-in (첫 방문 시) */}
+      {!moodSelected && <MoodCheckIn onSelect={handleMoodSelect} />}
+
+      {/* Messages */}
       <MessageList />
 
       {/* Mention + Input */}

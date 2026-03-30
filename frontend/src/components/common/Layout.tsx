@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { ChatRoom } from "@/components/chat/ChatRoom";
-import { OfficeView } from "@/components/office/OfficeView";
 import { Sidebar } from "@/components/sidebar/Sidebar";
 import { AgentProfileModal } from "@/components/common/AgentProfileModal";
 import type { AgentId } from "@/types/agent";
@@ -18,7 +17,6 @@ export function Layout() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  // 모바일에서 방 선택 시 사이드바 닫기
   const handleRoomSelect = () => {
     if (isMobile) setSidebarOpen(false);
   };
@@ -87,7 +85,6 @@ export function Layout() {
             </span>
           </div>
         )}
-        <OfficeView />
         <ChatRoom />
       </div>
 

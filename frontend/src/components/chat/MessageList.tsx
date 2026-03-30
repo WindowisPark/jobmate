@@ -132,36 +132,66 @@ export function MessageList() {
         <div
           style={{
             textAlign: "center",
-            marginTop: 80,
+            marginTop: 60,
+            padding: "0 32px",
             animation: "fadeIn 0.5s ease",
           }}
         >
           {isDM && agent ? (
             <>
-              <div style={{ margin: "0 auto 12px", width: 80 }}>
-                <AgentAvatar agentId={agent.id} size={80} />
+              <div style={{ margin: "0 auto 16px", width: 72 }}>
+                <AgentAvatar agentId={agent.id} size={72} />
               </div>
-              <div style={{ color: agent.color, fontWeight: 700, fontSize: 18, marginBottom: 4 }}>
+              <div style={{ color: agent.color, fontWeight: 700, fontSize: 20, marginBottom: 4 }}>
                 {agent.name}
               </div>
-              <div style={{ color: "var(--text-secondary)", fontSize: 14, marginBottom: 8 }}>
+              <div style={{ color: "var(--text-secondary)", fontSize: 14, marginBottom: 10 }}>
                 {agent.role} · {agent.personality}
               </div>
-              <div style={{ color: "var(--text-muted)", fontSize: 14, fontStyle: "italic" }}>
+              <div
+                style={{
+                  color: "var(--text-secondary)",
+                  fontSize: 14,
+                  fontStyle: "italic",
+                  background: "var(--bg-card)",
+                  display: "inline-block",
+                  padding: "10px 20px",
+                  borderRadius: "var(--radius-md)",
+                  lineHeight: 1.6,
+                }}
+              >
                 &ldquo;{agent.greeting}&rdquo;
               </div>
             </>
           ) : (
             <>
-              <div style={{ fontSize: 48, marginBottom: 12 }}>&#x1F44B;</div>
-              <div style={{ color: "var(--text-primary)", fontSize: 18, fontWeight: 600, marginBottom: 6 }}>
-                JobMate 팀에 오신 걸 환영해요!
+              <div
+                style={{
+                  width: 64,
+                  height: 64,
+                  margin: "0 auto 16px",
+                  borderRadius: "50%",
+                  background: "var(--gradient-calm)",
+                  border: "1px solid var(--border)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 28,
+                  animation: "gentleGlow 3s ease-in-out infinite",
+                }}
+              >
+                🌿
               </div>
-              <div style={{ color: "var(--text-secondary)", fontSize: 14, lineHeight: 1.8 }}>
-                취준 관련 고민이나 힘든 마음을 편하게 이야기해보세요.
+              <div style={{ color: "var(--text-white)", fontSize: 20, fontWeight: 600, marginBottom: 8 }}>
+                편하게 이야기해주세요
+              </div>
+              <div style={{ color: "var(--text-secondary)", fontSize: 14, lineHeight: 1.8, maxWidth: 360, margin: "0 auto" }}>
+                취업 고민, 이력서 피드백, 면접 준비,
+                <br />
+                혹은 그냥 힘든 마음까지 —
                 <br />
                 <span style={{ color: "var(--accent-link)" }}>@이름</span>으로
-                특정 멤버를 호출할 수 있어요.
+                원하는 멤버에게 직접 말을 걸 수도 있어요.
               </div>
             </>
           )}

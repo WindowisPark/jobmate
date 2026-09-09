@@ -29,3 +29,6 @@ Thumbs.db
 scripts/pixel-room/.cache/
 scripts/pixel-room/preview.png
 frontend/tsconfig.tsbuildinfo
+
+# 로컬 SQLite 개발 DB (scripts/dev_sqlite.py)
+backend/dev-sqlite.db*

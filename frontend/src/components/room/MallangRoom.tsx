@@ -15,6 +15,8 @@ export interface MallangRoomProps {
   theme?: RoomTheme;
   /** 지원 마감 임박(D-day≤3) 신호 → 책상 점등 */
   lit?: boolean;
+  /** 점등 라벨에 붙일 짧은 배지 (예: 'D-2'). 없으면 배지 생략 */
+  litLabel?: string;
   /** 미니미 그림·이름. 없으면 테마 기본 */
   me?: { src?: string; name?: string };
   /** 가구 앞에 도착했을 때(탭 이동·걷기 모두) */
@@ -36,7 +38,7 @@ function isTypingTarget(el: Element | null) {
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (el as HTMLElement).isContentEditable;
 }
 
-export function MallangRoom({ theme = PIXEL_THEME, lit = false, me, onOpen }: MallangRoomProps) {
+export function MallangRoom({ theme = PIXEL_THEME, lit = false, litLabel, me, onOpen }: MallangRoomProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const roomRef = useRef<HTMLDivElement>(null);
   const meRef = useRef<HTMLDivElement>(null);
@@ -245,7 +247,7 @@ export function MallangRoom({ theme = PIXEL_THEME, lit = false, me, onOpen }: Ma
               onClick={() => hopTo(h.stand, h)}
             >
               <span className={s.labelEmoji}>{h.emoji}</span>
-              <span className={s.labelText}>{h.label}{isLit ? " · D-1" : ""}{h.status === "soon" ? " (준비 중)" : ""}</span>
+              <span className={s.labelText}>{h.label}{isLit && litLabel ? ` · ${litLabel}` : ""}{h.status === "soon" ? " (준비 중)" : ""}</span>
             </button>
           );
         })}

@@ -32,7 +32,7 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
     response = await fetch(`${API_BASE_URL}${path}`, {
       credentials: "include",
       headers: {
-        "Content-Type": "application/json",
+        ...(options?.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
         ...options?.headers,
       },
       ...options,
@@ -56,7 +56,7 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
       const retryResponse = await fetch(`${API_BASE_URL}${path}`, {
         credentials: "include",
         headers: {
-          "Content-Type": "application/json",
+          ...(options?.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
           ...options?.headers,
         },
         ...options,
@@ -86,5 +86,9 @@ export const api = {
     fetchApi<T>(path, { method: "POST", body: body ? JSON.stringify(body) : undefined }),
   patch: <T>(path: string, body: unknown) =>
     fetchApi<T>(path, { method: "PATCH", body: JSON.stringify(body) }),
+  put: <T>(path: string, body: unknown) =>
+    fetchApi<T>(path, { method: "PUT", body: JSON.stringify(body) }),
   delete: <T>(path: string) => fetchApi<T>(path, { method: "DELETE" }),
+  /** multipart 업로드 — Content-Type 은 브라우저가 boundary 와 함께 붙인다 */
+  upload: <T>(path: string, form: FormData) => fetchApi<T>(path, { method: "POST", body: form }),
 };

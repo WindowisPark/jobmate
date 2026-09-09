@@ -1,0 +1,31 @@
+.layout { display: flex; height: 100vh; background: var(--bg-primary); color: var(--text-primary); overflow: hidden; }
+.roomArea { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; padding: 12px 16px; overflow: auto; }
+.topbar { display: flex; align-items: center; justify-content: space-between; }
+.brand { font-weight: 800; color: var(--text-white); font-size: 16px; }
+.brand small { font-weight: 500; color: var(--text-muted); margin-left: 6px; font-size: 12px; }
+.nav { display: flex; gap: 8px; }
+.navBtn {
+  background: var(--bg-tertiary); color: var(--text-secondary); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 6px 10px; font-size: 12px; cursor: pointer;
+}
+.navBtn:hover { background: var(--bg-hover); color: var(--text-white); }
+.hint { font-size: 11px; color: var(--text-muted); text-align: center; }
+
+.panel {
+  width: 520px; max-width: 100%; flex-shrink: 0; background: var(--bg-secondary);
+  border-left: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0;
+  box-shadow: -12px 0 32px rgba(0, 0, 0, 0.35);
+  animation: slideIn 0.22s ease both;
+}
+@keyframes slideIn { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+.mobile { flex-direction: column; }
+.roomHidden { display: none; }   /* 모바일 시트가 열리면 방은 숨긴다(마운트는 유지 → 미니미 위치 보존) */
+.mobile .roomArea { padding: 10px; }
+.sheet {
+  position: fixed; inset: 0; width: 100%; border-left: 0; z-index: 200;
+  animation: sheetUp 0.24s ease both;
+}
+@keyframes sheetUp { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) { .panel, .sheet { animation: none; } }

@@ -10,7 +10,7 @@ import { useWebSocket } from "@/hooks/useWebSocket";
 import { AGENTS } from "@/types/agent";
 import type { AgentId } from "@/types/agent";
 
-export function ChatRoom() {
+export function ChatRoom({ embedded = false }: { embedded?: boolean } = {}) {
   const [input, setInput] = useState("");
   const [showMention, setShowMention] = useState(false);
   const [mentionFilter, setMentionFilter] = useState("");
@@ -86,8 +86,8 @@ export function ChatRoom() {
         minHeight: 0,
       }}
     >
-      {/* Header */}
-      <div
+      {/* Header (방 안 패널에서는 패널 헤더가 대신한다) */}
+      {!embedded && <div
         style={{
           padding: "12px 20px",
           borderBottom: "1px solid var(--border)",
@@ -127,13 +127,13 @@ export function ChatRoom() {
             </span>
           </>
         )}
-      </div>
+      </div>}
 
-      {/* Agent Presence Bar */}
-      <AgentPresenceBar />
+      {/* Agent Presence Bar — 방 안 DM 패널은 한 친구와의 대화라 네 명 스트립을 두지 않는다 */}
+      {!embedded && <AgentPresenceBar />}
 
-      {/* Mood Check-in (첫 방문 시) */}
-      {!moodSelected && <MoodCheckIn onSelect={handleMoodSelect} />}
+      {/* Mood Check-in (첫 방문 시) — 팀 채팅 또는 토닥이(멘탈 케어)와의 DM 에서만 */}
+      {!moodSelected && (!isDM || agent?.id === "ha_eun") && <MoodCheckIn onSelect={handleMoodSelect} />}
 
       {/* Messages */}
       <MessageList />

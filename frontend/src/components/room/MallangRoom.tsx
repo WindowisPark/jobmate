@@ -1,26 +1,27 @@
 // 내 방 — DOM/CSS 렌더러 (테마: 픽셀 / 말랑이).
 // 배경 이미지 1장(없으면 CSS 폴백) + 가구 핫스팟 + 캐릭터 PNG 스프라이트 + 말풍선.
-// 이동 세 가지: 가구 탭(그 앞으로 hop) · 바닥 탭(거기로 hop) · 방향키/WASD(걷기, 가구에 막힘). 가구 앞에 멈추면 열린다.
-// 픽셀 테마는 방 폭을 원본(176px)의 정수배로 스냅하고 image-rendering: pixelated 로 그려 픽셀이 뭉개지지 않게 한다.
+// 이동: 가구/친구 탭(그 앞으로 hop) · 바닥 탭(거기로 hop) · 방향키/WASD(걷기, 가구에 막힘).
+// 도착하면 바로 열지 않고 '확인' 간판이 뜬다 — 다시 탭하거나 Enter/Space 로 열기. 방을 떠나는 동작(채팅)이 특히 그렇다.
+// 픽셀 테마는 방 폭을 원본(176px)의 정수배로 스냅하고 image-rendering: pixelated 로 그린다.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import s from "./MallangRoom.module.css";
 import {
   HOP_MS, PIXEL_THEME, WALK_SPEED_X,
-  canStand, hotspotNear,
-  type Box, type Hotspot, type Pct, type RoomTheme,
+  canStand, targetKey, targetLabel, targetNear,
+  type Box, type Hotspot, type OpenTarget, type Pct, type RoomNpc, type RoomTheme,
 } from "./roomLayout";
 
 export interface MallangRoomProps {
   theme?: RoomTheme;
   /** 지원 마감 임박(D-day≤3) 신호 → 책상 점등 */
   lit?: boolean;
-  /** 점등 라벨에 붙일 짧은 배지 (예: 'D-2'). 없으면 배지 생략 */
+  /** 점등 라벨에 붙일 짧은 배지 (예: 'D-2') */
   litLabel?: string;
   /** 미니미 그림·이름. 없으면 테마 기본 */
   me?: { src?: string; name?: string };
-  /** 가구 앞에 도착했을 때(탭 이동·걷기 모두) */
-  onOpen: (h: Hotspot) => void;
+  /** 확인 단계를 거쳐 열기로 결정됐을 때 */
+  onOpen: (target: OpenTarget) => void;
 }
 
 const boxStyle = (b: Box): React.CSSProperties => ({ left: `${b.x}%`, top: `${b.y}%`, width: `${b.w}%`, height: `${b.h}%` });
@@ -31,6 +32,7 @@ const KEY_DIR: Record<string, Pct> = {
   ArrowUp: { x: 0, y: -1 }, w: { x: 0, y: -1 }, W: { x: 0, y: -1 },
   ArrowDown: { x: 0, y: 1 }, s: { x: 0, y: 1 }, S: { x: 0, y: 1 },
 };
+const CONFIRM_KEYS = new Set(["Enter", " "]);
 
 function isTypingTarget(el: Element | null) {
   if (!el) return false;
@@ -42,25 +44,29 @@ export function MallangRoom({ theme = PIXEL_THEME, lit = false, litLabel, me, on
   const hostRef = useRef<HTMLDivElement>(null);
   const roomRef = useRef<HTMLDivElement>(null);
   const meRef = useRef<HTMLDivElement>(null);
-  const posRef = useRef<Pct>(theme.meStart);        // 진짜 위치(키보드 이동 중엔 DOM에 직접 쓴다)
+  const posRef = useRef<Pct>(theme.meStart);
   const [mePos, setMePos] = useState<Pct>(theme.meStart);
   const [facingLeft, setFacingLeft] = useState(false);
-  const [hopping, setHopping] = useState(false);    // 탭 이동 중
-  const [walking, setWalking] = useState(false);    // 키보드 이동 중
-  const [pendingId, setPendingId] = useState<Hotspot["id"] | null>(null);
+  const [hopping, setHopping] = useState(false);
+  const [walking, setWalking] = useState(false);
+  const [pendingKey, setPendingKey] = useState<string | null>(null);   // 이동 중인 목표(라벨 강조)
+  const [ready, setReady] = useState<OpenTarget | null>(null);         // 도착해서 확인 대기 중인 대상
   const [snapWidth, setSnapWidth] = useState<number | null>(null);
   const hopTimer = useRef<number | null>(null);
-  const lastOpened = useRef<Hotspot["id"] | null>(null);
+  const readyRef = useRef<OpenTarget | null>(null);
+  const dismissedKey = useRef<string | null>(null);   // 열고 난 뒤, 그 자리를 떠나기 전까진 다시 묻지 않는다
   const onOpenRef = useRef(onOpen);
   onOpenRef.current = onOpen;
   const themeRef = useRef(theme);
   themeRef.current = theme;
 
-  // 테마가 바뀌면 시작 위치로
+  const setReadyBoth = (t: OpenTarget | null) => { readyRef.current = t; setReady(t); };
+
   useEffect(() => {
     posRef.current = theme.meStart;
     setMePos(theme.meStart);
-    lastOpened.current = null;
+    setReadyBoth(null);
+    dismissedKey.current = null;
   }, [theme]);
 
   // 픽셀 테마: 방 폭을 원본의 정수배로 스냅
@@ -68,37 +74,50 @@ export function MallangRoom({ theme = PIXEL_THEME, lit = false, litLabel, me, on
     const host = hostRef.current;
     if (!host || !theme.pixelArt || !theme.nativeWidth) { setSnapWidth(null); return; }
     const nat = theme.nativeWidth;
-    const update = () => setSnapWidth(Math.max(2, Math.floor(Math.min(host.clientWidth, 960) / nat)) * nat);   // max-width(960)와 정합
+    const update = () => setSnapWidth(Math.max(2, Math.floor(Math.min(host.clientWidth, 960) / nat)) * nat);
     update();
     const ro = new ResizeObserver(update);
     ro.observe(host);
     return () => ro.disconnect();
   }, [theme]);
 
-  const open = useCallback((h: Hotspot) => {
-    lastOpened.current = h.id;
-    onOpenRef.current(h);
+  const open = useCallback((t: OpenTarget) => {
+    dismissedKey.current = targetKey(t);
+    setReadyBoth(null);
+    onOpenRef.current(t);
   }, []);
 
-  // ---- 탭 이동(hop): CSS transition 으로 left/top 을 옮기고, 끝나면 도착 처리
-  const hopTo = useCallback((target: Pct, h: Hotspot | null) => {
+  /** 도착 처리 — 확인 대기로 전환(같은 자리에서 방금 열었다면 다시 묻지 않음) */
+  const arrive = useCallback((p: Pct) => {
+    const t = targetNear(themeRef.current, p);
+    const key = targetKey(t);
+    if (!t || key === dismissedKey.current) { setReadyBoth(null); return; }
+    setReadyBoth(t);
+  }, []);
+
+  // ---- 탭 이동(hop)
+  const hopTo = useCallback((target: Pct, intent: OpenTarget | null) => {
     if (hopTimer.current) window.clearTimeout(hopTimer.current);
+    // 이미 그 대상 앞에서 확인 대기 중이면 두 번째 탭 = 열기
+    if (intent && readyRef.current && targetKey(readyRef.current) === targetKey(intent)) { open(intent); return; }
+    setReadyBoth(null);
+    dismissedKey.current = null;
     setFacingLeft(target.x < posRef.current.x);
     posRef.current = target;
     setMePos(target);
-    setPendingId(h?.id ?? null);
+    setPendingKey(targetKey(intent));
     setHopping(true);
     hopTimer.current = window.setTimeout(() => {
       setHopping(false);
-      setPendingId(null);
-      if (h) open(h);
-      else lastOpened.current = null;
+      setPendingKey(null);
+      if (intent) setReadyBoth(intent);
+      else arrive(target);
     }, HOP_MS);
-  }, [open]);
+  }, [open, arrive]);
 
   useEffect(() => () => { if (hopTimer.current) window.clearTimeout(hopTimer.current); }, []);
 
-  // ---- 바닥 탭: 버튼(핫스팟·라벨) 위가 아니고 서 있을 수 있는 자리면 그곳으로
+  // ---- 바닥 탭
   const onRoomPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest("button")) return;
     const rect = roomRef.current?.getBoundingClientRect();
@@ -109,7 +128,7 @@ export function MallangRoom({ theme = PIXEL_THEME, lit = false, litLabel, me, on
     hopTo(p, null);
   };
 
-  // ---- 키보드 걷기: rAF 루프가 posRef 와 DOM 을 직접 갱신하고, 멈출 때 state 로 동기화
+  // ---- 키보드: 걷기 + Enter/Space 확인
   useEffect(() => {
     const keys = new Set<string>();
     let raf = 0;
@@ -129,7 +148,6 @@ export function MallangRoom({ theme = PIXEL_THEME, lit = false, litLabel, me, on
       dy = Math.sign(dy);
       if (dx !== 0 || dy !== 0) {
         const p = posRef.current;
-        // 축 분리 충돌 — 가구에 비스듬히 부딛혀도 미끄러진다
         const nx = { x: p.x + dx * WALK_SPEED_X * dt, y: p.y };
         const after1 = canStand(t, nx) ? nx : p;
         const ny = { x: after1.x, y: after1.y + dy * WALK_SPEED_X * t.aspect * dt };
@@ -142,14 +160,17 @@ export function MallangRoom({ theme = PIXEL_THEME, lit = false, litLabel, me, on
           el.style.zIndex = String(Math.round(next.y * 10));
         }
         if (dx !== 0) setFacingLeft(dx < 0);
-        if (lastOpened.current && !hotspotNear(t, next)) lastOpened.current = null;
+        // 대상 앞을 떠나면 확인 간판을 내리고, 다시 물을 수 있게 한다
+        const nearNow = targetKey(targetNear(t, next));
+        if (readyRef.current && nearNow !== targetKey(readyRef.current)) setReadyBoth(null);
+        if (dismissedKey.current && nearNow !== dismissedKey.current) dismissedKey.current = null;
       }
       raf = requestAnimationFrame(step);
     };
 
     const start = () => {
       if (raf) return;
-      if (hopTimer.current) { window.clearTimeout(hopTimer.current); hopTimer.current = null; setHopping(false); setPendingId(null); }
+      if (hopTimer.current) { window.clearTimeout(hopTimer.current); hopTimer.current = null; setHopping(false); setPendingKey(null); }
       setWalking(true);
       last = performance.now();
       raf = requestAnimationFrame(step);
@@ -160,12 +181,16 @@ export function MallangRoom({ theme = PIXEL_THEME, lit = false, litLabel, me, on
       raf = 0;
       setWalking(false);
       setMePos(posRef.current);
-      const near = hotspotNear(themeRef.current, posRef.current);
-      if (near && lastOpened.current !== near.id) open(near);
+      arrive(posRef.current);
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (!KEY_DIR[e.key] || isTypingTarget(document.activeElement)) return;
+      if (isTypingTarget(document.activeElement)) return;
+      if (CONFIRM_KEYS.has(e.key)) {
+        if (readyRef.current) { e.preventDefault(); open(readyRef.current); }
+        return;
+      }
+      if (!KEY_DIR[e.key]) return;
       e.preventDefault();
       keys.add(e.key);
       start();
@@ -185,7 +210,7 @@ export function MallangRoom({ theme = PIXEL_THEME, lit = false, litLabel, me, on
       window.removeEventListener("blur", onBlur);
       if (raf) cancelAnimationFrame(raf);
     };
-  }, [open]);
+  }, [open, arrive]);
 
   const meSrc = me?.src ?? theme.sprites.me;
   const meName = me?.name ?? "나";
@@ -193,6 +218,15 @@ export function MallangRoom({ theme = PIXEL_THEME, lit = false, litLabel, me, on
   const footStyle = (p: Pct): React.CSSProperties => ({
     left: `${p.x}%`, top: `${p.y}%`, width: `max(${theme.spriteWPct}%, ${theme.pixelArt ? 32 : 46}px)`, zIndex: Math.round(p.y * 10),
   });
+  const hotspotIntent = (h: Hotspot): OpenTarget => ({ kind: "hotspot", hotspot: h });
+  const npcIntent = (n: RoomNpc): OpenTarget => ({ kind: "npc", agentId: n.id, npc: n });
+
+  // 확인 간판 위치: 대상 위쪽
+  const readyAnchor: Pct | null = ready
+    ? ready.kind === "hotspot"
+      ? { x: ready.hotspot.box.x + ready.hotspot.box.w / 2, y: ready.hotspot.box.y }
+      : { x: ready.npc.pos.x, y: ready.npc.pos.y - theme.spriteWPct * theme.aspect * 1.4 }
+    : null;
 
   return (
     <div ref={hostRef} className={s.host}>
@@ -202,10 +236,9 @@ export function MallangRoom({ theme = PIXEL_THEME, lit = false, litLabel, me, on
         style={{ aspectRatio: `${theme.aspect}`, width: snapWidth ? `${snapWidth}px` : undefined }}
         tabIndex={0}
         role="application"
-        aria-label="내 방. 방향키로 이동, 가구를 눌러 열기"
+        aria-label="내 방. 방향키로 이동, 가구나 친구 앞에서 Enter 로 열기"
         onPointerDown={onRoomPointerDown}
       >
-        {/* 배경 */}
         {theme.bgSrc ? (
           <img className={s.bg} src={theme.bgSrc} alt="" draggable={false} />
         ) : (
@@ -215,19 +248,17 @@ export function MallangRoom({ theme = PIXEL_THEME, lit = false, litLabel, me, on
             <div className={s.floor} style={{ top: `${theme.wallPct}%` }} />
             {theme.decor.map((d, i) => <div key={i} className={`${s.decor} ${s[d.kind] ?? ""}`} style={boxStyle(d.box)} />)}
             {theme.hotspots.map((h) => <div key={h.id} className={`${s.decor} ${s[`f_${h.id}`] ?? ""}`} style={boxStyle(h.box)} />)}
-            <span className={s.placeholderNote}>배경 그림 자리 · public/room/bg.jpg (docs/brand/room-art-prompt.md)</span>
           </div>
         )}
 
-        {/* D-day 신호: 책상 점등 */}
         {lit && <div className={s.glow} style={boxStyle(theme.glowBox)} />}
 
         {/* 가구 핫스팟(탭 영역) */}
         {theme.hotspots.map((h) => (
-          <button key={h.id} type="button" className={s.hotspot} style={boxStyle(h.box)} aria-label={`${h.label} 열기`} onClick={() => hopTo(h.stand, h)} />
+          <button key={h.id} type="button" className={s.hotspot} style={boxStyle(h.box)} aria-label={`${h.label} ${h.verb}`} onClick={() => hopTo(h.stand, hotspotIntent(h))} />
         ))}
 
-        {/* 가구 라벨 */}
+        {/* 가구 간판 */}
         {theme.hotspots.map((h) => {
           const isLit = lit && h.id === "tracker";
           const cx = h.box.x + h.box.w / 2;
@@ -238,31 +269,34 @@ export function MallangRoom({ theme = PIXEL_THEME, lit = false, litLabel, me, on
             right: align === "right" ? `${100 - (h.box.x + h.box.w)}%` : undefined,
             transform: `translate(${align === "center" ? "-50%" : "0"}, ${h.labelAt === "top" ? "-100%" : "0"})`,
           };
+          const key = `h:${h.id}`;
           return (
             <button
               key={`label-${h.id}`}
               type="button"
-              className={[s.label, isLit ? s.labelLit : "", pendingId === h.id ? s.labelActive : "", h.status === "soon" ? s.labelSoon : ""].join(" ")}
+              className={[s.label, isLit ? s.labelLit : "", pendingKey === key ? s.labelActive : "", h.status === "soon" ? s.labelSoon : ""].join(" ")}
               style={style}
-              onClick={() => hopTo(h.stand, h)}
+              onClick={() => hopTo(h.stand, hotspotIntent(h))}
             >
-              <span className={s.labelEmoji}>{h.emoji}</span>
-              <span className={s.labelText}>{h.label}{isLit && litLabel ? ` · ${litLabel}` : ""}{h.status === "soon" ? " (준비 중)" : ""}</span>
+              {h.label}{isLit && litLabel ? ` · ${litLabel}` : ""}{h.status === "soon" ? " (준비 중)" : ""}
             </button>
           );
         })}
 
-        {/* NPC */}
-        {theme.npcs.map((n) => (
-          <div key={n.id} className={s.sprite} style={footStyle(n.pos)} title={`${n.name} · ${n.role}`}>
+        {/* 친구(NPC) — 탭하면 곁으로 가서 대화 확인 */}
+        {theme.npcs.map((n, i) => (
+          <div key={n.id} className={`${s.sprite} ${s.npc}`} style={footStyle(n.pos)} title={`${n.name} · ${n.role}`}>
             {n.bubble && (
-              <div className={s.bubble}>
+              /* 좁은 화면에서는 첫 말풍선 하나만 — 겹침 방지. M3 에서 우선순위는 npc_prompts 가 정한다 */
+              <div className={`${s.bubble} ${theme.npcs.findIndex((m) => m.bubble) !== i ? s.bubbleSecondary : ""}`}>
                 <b>{n.name}</b> {n.bubble}
               </div>
             )}
-            <span className={s.flip} style={{ transform: n.flip ? "scaleX(-1)" : undefined }}>
-              <img className={`${s.mallang} ${s.idle}`} src={theme.sprites[n.id]} alt={`${n.name} (${n.role})`} draggable={false} style={{ animationDelay: `${(n.pos.x % 7) * 0.3}s` }} />
-            </span>
+            <button type="button" className={s.npcHit} aria-label={`${n.name}와 이야기하기`} onClick={() => hopTo(n.stand, npcIntent(n))}>
+              <span className={s.flip} style={{ transform: n.flip ? "scaleX(-1)" : undefined }}>
+                <img className={`${s.mallang} ${s.idle}`} src={theme.sprites[n.id]} alt="" draggable={false} style={{ animationDelay: `${(n.pos.x % 7) * 0.3}s` }} />
+              </span>
+            </button>
             <div className={s.shadow} />
             <span className={s.nameTag}>{n.name}<small className={s.role}>{n.role}</small></span>
           </div>
@@ -276,6 +310,18 @@ export function MallangRoom({ theme = PIXEL_THEME, lit = false, litLabel, me, on
           <div className={`${s.shadow} ${moving ? s.shadowHop : ""}`} style={{ animationDuration: moving ? `${HOP_MS / 2}ms` : undefined }} />
           <span className={`${s.nameTag} ${s.meTag}`}>{meName}</span>
         </div>
+
+        {/* 확인 간판 — 도착 후 한 번 더 */}
+        {ready && readyAnchor && (
+          <div className={s.confirm} style={{ left: `${Math.max(12, Math.min(88, readyAnchor.x))}%`, top: `${readyAnchor.y}%` }} role="dialog" aria-live="polite">
+            <button type="button" className={s.confirmBtn} onClick={() => open(ready)} autoFocus>
+              {targetLabel(ready)} <span className={s.confirmKey}>Enter</span>
+            </button>
+            <button type="button" className={s.confirmCancel} onClick={() => { dismissedKey.current = targetKey(ready); setReadyBoth(null); }} aria-label="아니오">
+              ✕
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

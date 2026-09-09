@@ -35,7 +35,7 @@ export function MoodCheckIn({ onSelect }: Props) {
     <div
       style={{
         padding: "16px 20px",
-        background: "linear-gradient(135deg, #1e2838 0%, #1b2530 50%, #1e2330 100%)",
+        background: "var(--bg-secondary)",   /* 테마 토큰 — 방 안 패널에서는 따뜻한 톤을 그대로 잇는다 */
         borderBottom: "1px solid var(--border)",
         animation: "fadeIn 0.5s ease",
       }}

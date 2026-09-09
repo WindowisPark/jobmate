@@ -12,8 +12,8 @@ import { Empty } from "./bits";
 import s from "./Tracker.module.css";
 
 const VIEWS: { key: TrackerView; label: string }[] = [
-  { key: "board", label: "🔥 진행중" }, { key: "calendar", label: "📅 캘린더" },
-  { key: "season", label: "📊 시즌별" }, { key: "track", label: "🧭 트랙별" }, { key: "table", label: "📋 전체" },
+  { key: "board", label: "진행중" }, { key: "calendar", label: "캘린더" },
+  { key: "season", label: "시즌별" }, { key: "track", label: "트랙별" }, { key: "table", label: "전체" },
 ];
 
 export function TrackerBuilding({ mode }: { mode: "list" | "new" | "import" | "detail" }) {
@@ -36,7 +36,7 @@ export function TrackerBuilding({ mode }: { mode: "list" | "new" | "import" | "d
     <section className={s.building} aria-label="지원 대시보드">
       <header className={s.head}>
         {mode !== "list" && <button type="button" className={s.iconBtn} onClick={back} aria-label="목록으로">‹</button>}
-        <h2 className={s.title}>📝 {title}</h2>
+        <h2 className={s.title}>{title}</h2>
         {mode === "list" && (
           <>
             <button type="button" className={s.iconBtn} onClick={() => navigate("/village/tracker/import")}>CSV</button>
@@ -77,12 +77,12 @@ export function TrackerBuilding({ mode }: { mode: "list" | "new" | "import" | "d
 }
 
 /** documents / jobs 건물 — 아직 준비 중 */
-export function ComingSoonBuilding({ emoji, label, note }: { emoji: string; label: string; note: string }) {
+export function ComingSoonBuilding({ label, note }: { label: string; note: string }) {
   const navigate = useNavigate();
   return (
     <section className={s.building}>
       <header className={s.head}>
-        <h2 className={s.title}>{emoji} {label}</h2>
+        <h2 className={s.title}>{label}</h2>
         <button type="button" className={s.iconBtn} onClick={() => navigate("/village")} aria-label="방으로">✕</button>
       </header>
       <div className={s.body}><Empty>{note}</Empty></div>

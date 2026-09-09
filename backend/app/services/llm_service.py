@@ -14,10 +14,10 @@ LLM_MAX_RETRIES = 1
 
 # 에이전트 ID → 표시 이름 매핑
 _AGENT_NAMES: dict[str, str] = {
-    "seo_yeon": "김서연",
-    "jun_ho": "박준호",
-    "ha_eun": "이하은",
-    "min_su": "정민수",
+    "seo_yeon": "첨삭이",
+    "jun_ho": "탐색이",
+    "ha_eun": "토닥이",
+    "min_su": "꿀팁이",
 }
 
 _client: AsyncOpenAI | None = None

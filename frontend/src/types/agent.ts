@@ -31,7 +31,7 @@ export interface AgentOfficeState {
 export const AGENTS: Record<AgentId, AgentProfile> = {
   seo_yeon: {
     id: "seo_yeon",
-    name: "김서연",
+    name: "첨삭이",
     role: "커리어 코치",
     avatarUrl: "/assets/agents/seo-yeon.png",
     color: "#e06c75",
@@ -42,7 +42,7 @@ export const AGENTS: Record<AgentId, AgentProfile> = {
   },
   jun_ho: {
     id: "jun_ho",
-    name: "박준호",
+    name: "탐색이",
     role: "취업 리서처",
     avatarUrl: "/assets/agents/jun-ho.png",
     color: "#61afef",
@@ -53,7 +53,7 @@ export const AGENTS: Record<AgentId, AgentProfile> = {
   },
   ha_eun: {
     id: "ha_eun",
-    name: "이하은",
+    name: "토닥이",
     role: "멘탈 케어",
     avatarUrl: "/assets/agents/ha-eun.png",
     color: "#98c379",
@@ -64,7 +64,7 @@ export const AGENTS: Record<AgentId, AgentProfile> = {
   },
   min_su: {
     id: "min_su",
-    name: "정민수",
+    name: "꿀팁이",
     role: "현직자 멘토",
     avatarUrl: "/assets/agents/min-su.png",
     color: "#e5c07b",

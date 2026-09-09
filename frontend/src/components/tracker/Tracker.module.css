@@ -2,7 +2,7 @@
 
 .building { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 .head { display: flex; align-items: center; gap: 10px; padding: 12px 14px 8px; border-bottom: 1px solid var(--border); }
-.title { font-weight: 800; color: var(--text-white); font-size: 15px; flex: 1; }
+.title { font-family: var(--font-pixel); font-weight: 700; color: var(--text-white); font-size: 17px; flex: 1; }
 .iconBtn {
   background: transparent; border: 1px solid var(--border); color: var(--text-secondary); border-radius: var(--radius-sm);
   padding: 5px 9px; cursor: pointer; font-size: 12px; white-space: nowrap;
@@ -13,7 +13,7 @@
   padding: 6px 12px; cursor: pointer; font-size: 12px; font-weight: 700; white-space: nowrap;
 }
 .primaryBtn:disabled { opacity: 0.5; cursor: default; }
-.dangerBtn { background: transparent; border: 1px solid #7a3b3b; color: #e06c75; border-radius: var(--radius-sm); padding: 5px 9px; cursor: pointer; font-size: 12px; }
+.dangerBtn { background: transparent; border: 1px solid var(--danger); color: var(--danger); border-radius: var(--radius-sm); padding: 5px 9px; cursor: pointer; font-size: 12px; }
 
 .tabs { display: flex; gap: 4px; padding: 8px 14px 0; overflow-x: auto; }
 .tab { background: transparent; border: 0; color: var(--text-muted); font-size: 12px; padding: 6px 8px; border-radius: var(--radius-sm); cursor: pointer; white-space: nowrap; }
@@ -62,7 +62,7 @@
 .calCellSel { background: var(--bg-tertiary); }
 .calDay { color: var(--text-secondary); }
 .calDot { font-size: 10px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.calDeadline { color: #ff9a9a; }
+.calDeadline { color: var(--danger); }
 .calEvent { color: #7fd3c5; }
 .calList { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
 
@@ -89,7 +89,7 @@
 .field input:focus, .field select:focus, .field textarea:focus { outline: 2px solid var(--accent-blue); outline-offset: -1px; }
 .field textarea { min-height: 64px; resize: vertical; }
 .formActions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
-.error { color: #ff9a9a; font-size: 12px; }
+.error { color: var(--danger); font-size: 12px; }
 
 /* 상세 */
 .detailHead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }

@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import { MallangRoom } from "@/components/room/MallangRoom";
 import { MALLANG_THEME, PIXEL_THEME, PIXEL_THEME_KENNEY } from "@/components/room/roomLayout";
-import type { Hotspot, RoomTheme } from "@/components/room/roomLayout";
+import type { OpenTarget, RoomTheme } from "@/components/room/roomLayout";
 
 const THEMES: Array<{ key: string; label: string; theme: RoomTheme; note: string }> = [
   { key: "pixel", label: "픽셀 · 블롭", theme: PIXEL_THEME, note: "Kenney 16px 방 + 방 팔레트로 그린 슬라임" },
@@ -16,8 +16,9 @@ export default function SpikePage() {
   const [themeKey, setThemeKey] = useState("pixel");
   const [banner, setBanner] = useState<string | null>(null);
 
-  const handleOpen = useCallback((h: Hotspot) => {
-    setBanner(h.status === "soon" ? `${h.emoji} ${h.label} — 준비 중이에요` : `${h.emoji} ${h.label} 열기`);
+  const handleOpen = useCallback((t: OpenTarget) => {
+    if (t.kind === "npc") setBanner(`${t.npc.name}와 대화 시작`);
+    else setBanner(t.hotspot.status === "soon" ? `${t.hotspot.label} — 준비 중이에요` : `${t.hotspot.label} ${t.hotspot.verb}`);
     window.setTimeout(() => setBanner(null), 1800);
   }, []);
 

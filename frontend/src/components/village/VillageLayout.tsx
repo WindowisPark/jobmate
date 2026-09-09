@@ -2,11 +2,11 @@
 import { useEffect } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { MallangRoom } from "@/components/room/MallangRoom";
-import type { Hotspot, HotspotId } from "@/components/room/roomLayout";
+import type { HotspotId, OpenTarget } from "@/components/room/roomLayout";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useApplicationStore, selectUrgent } from "@/stores/applicationStore";
 import { dDay, ddayLabel } from "@/types/application";
-import { HOTSPOT_ROUTES, useWorldStore } from "@/stores/worldStore";
+import { HOTSPOT_ROUTES, npcChatRoute, useWorldStore } from "@/stores/worldStore";
 import { toast } from "@/stores/toastStore";
 import s from "./Village.module.css";
 
@@ -14,6 +14,7 @@ const PANEL_BY_PATH: Array<[prefix: string, id: HotspotId]> = [
   ["/village/tracker", "tracker"],
   ["/village/documents", "documents"],
   ["/village/jobs", "jobs"],
+  ["/village/chat", "mental"],
 ];
 
 export function VillageLayout() {
@@ -39,10 +40,14 @@ export function VillageLayout() {
     else exit();
   }, [location.pathname, enter, exit]);
 
-  const onOpen = (h: Hotspot) => {
-    const route = HOTSPOT_ROUTES[h.id];
+  const onOpen = (t: OpenTarget) => {
+    if (t.kind === "npc") {
+      navigate(npcChatRoute(t.agentId));
+      return;
+    }
+    const route = HOTSPOT_ROUTES[t.hotspot.id];
     if (!route) {
-      toast.info(`${h.emoji} ${h.label}는 준비 중이에요`);
+      toast.info(`${t.hotspot.label}는 준비 중이에요`);
       return;
     }
     navigate(route);
@@ -55,13 +60,11 @@ export function VillageLayout() {
       <div className={`${s.roomArea} ${panelOpen && isMobile ? s.roomHidden : ""}`} aria-hidden={panelOpen && isMobile}>
         <header className={s.topbar}>
           <span className={s.brand}>JobMate <small>내 방</small></span>
-          <nav className={s.nav}>
-            <button type="button" onClick={() => navigate("/chat")} className={s.navBtn}>💬 채팅</button>
-          </nav>
+          <nav className={s.nav} />
         </header>
         <MallangRoom lit={lit} litLabel={litLabel} onOpen={onOpen} />
         {!panelOpen && (
-          <p className={s.hint}>가구를 누르거나 방향키로 걸어가 보세요 · 책상이 빛나면 마감이 3일 안이에요</p>
+          <p className={s.hint}>가구나 친구를 누르거나 방향키로 걸어가세요 · 도착하면 한 번 더 눌러 열어요 · 책상이 빛나면 마감 3일 안</p>
         )}
       </div>
 

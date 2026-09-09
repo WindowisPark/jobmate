@@ -34,10 +34,10 @@ interface ChatState {
 
 const DEFAULT_ROOMS: ChatRoom[] = [
   { id: "general", type: "channel", name: "general" },
-  { id: "dm-seo_yeon", type: "dm", name: "김서연", agentId: "seo_yeon" },
-  { id: "dm-jun_ho", type: "dm", name: "박준호", agentId: "jun_ho" },
-  { id: "dm-ha_eun", type: "dm", name: "이하은", agentId: "ha_eun" },
-  { id: "dm-min_su", type: "dm", name: "정민수", agentId: "min_su" },
+  { id: "dm-seo_yeon", type: "dm", name: "첨삭이", agentId: "seo_yeon" },
+  { id: "dm-jun_ho", type: "dm", name: "탐색이", agentId: "jun_ho" },
+  { id: "dm-ha_eun", type: "dm", name: "토닥이", agentId: "ha_eun" },
+  { id: "dm-min_su", type: "dm", name: "꿀팁이", agentId: "min_su" },
 ];
 
 export const useChatStore = create<ChatState>((set) => ({

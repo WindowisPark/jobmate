@@ -45,7 +45,7 @@ export function Sidebar({ onAgentProfileClick, onRoomSelect }: Props) {
           title="내 방으로"
           style={{ marginLeft: "auto", background: "transparent", border: "1px solid var(--border)", color: "var(--text-secondary)", borderRadius: 6, padding: "3px 8px", fontSize: 12, cursor: "pointer" }}
         >
-          🏡 내 방
+          내 방
         </button>
       </div>
 

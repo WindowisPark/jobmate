@@ -10,6 +10,7 @@ import { ToastContainer } from "@/components/common/ToastContainer";
 import { api } from "@/utils/api";
 import { VillageLayout } from "@/components/village/VillageLayout";
 import { ComingSoonBuilding, TrackerBuilding } from "@/components/tracker/TrackerBuilding";
+import { ChatBuilding } from "@/components/village/ChatBuilding";
 
 
 // M0 렌더링 스파이크 — 개발 빌드에서만. 렌더러 결정 후 spike/와 함께 제거한다.
@@ -146,8 +147,9 @@ function AppContent() {
         <Route path="tracker/new" element={<TrackerBuilding mode="new" />} />
         <Route path="tracker/import" element={<TrackerBuilding mode="import" />} />
         <Route path="tracker/:id" element={<TrackerBuilding mode="detail" />} />
-        <Route path="documents" element={<ComingSoonBuilding emoji="📚" label="이력서·자소서" note="이력서·자소서 보관함은 다음 건물이에요. 지금은 지원 내역에 '이력서 버전' 이름만 달아두세요." />} />
-        <Route path="jobs" element={<ComingSoonBuilding emoji="📮" label="공고 게시판" note="공고 탐색은 채팅에서 탐색이에게 물어보세요 — 게시판 건물은 준비 중입니다." />} />
+        <Route path="chat/:roomId" element={<ChatBuilding />} />
+        <Route path="documents" element={<ComingSoonBuilding label="이력서·자소서" note="이력서·자소서 보관함은 다음 건물이에요. 지금은 지원 내역에 '이력서 버전' 이름만 달아두세요." />} />
+        <Route path="jobs" element={<ComingSoonBuilding label="공고 게시판" note="공고 탐색은 채팅에서 탐색이에게 물어보세요 — 게시판 건물은 준비 중입니다." />} />
       </Route>
       <Route path="/chat/*" element={<Layout />} />
       <Route path="*" element={<Navigate to="/village" replace />} />

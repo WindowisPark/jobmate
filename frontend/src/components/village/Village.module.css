@@ -1,20 +1,46 @@
-.layout { display: flex; height: 100vh; background: var(--bg-primary); color: var(--text-primary); overflow: hidden; }
+/* 방 안 흐름은 방의 팔레트를 상속한다 — 컴포넌트들이 토큰만 쓰므로 여기서 덮어쓰면 패널·채팅이 같은 분위기가 된다 */
+.layout {
+  --bg-primary: #e6d7bd;
+  --bg-secondary: #f6eedc;
+  --bg-tertiary: #e5d4b4;
+  --bg-hover: #dcc9a6;
+  --bg-active: #b9885a;
+  --bg-input: #fffaf0;
+  --bg-card: #fbf5e8;
+  --border: #c9b18c;
+  --border-input: #a98c66;
+  --text-primary: #3b2f26;
+  --text-secondary: #6f5b48;
+  --text-muted: #9c8568;
+  --text-white: #2a2019;
+  --accent-blue: #4f86b3;
+  --accent-link: #3f6f95;
+  --accent-warm: #a8681f;
+  --danger: #b23b3b;
+  --gradient-calm: linear-gradient(135deg, #f6eedc 0%, #efe3cf 100%);
+  --gradient-presence: linear-gradient(180deg, #f6eedc 0%, #efe3cf 100%);
+  display: flex; height: 100vh; color: var(--text-primary); overflow: hidden;
+  background:
+    repeating-linear-gradient(180deg, rgba(74, 52, 30, 0.05) 0 2px, transparent 2px 22px),
+    linear-gradient(180deg, #d9c39f 0%, #cdb28a 100%);
+}
 .roomArea { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; padding: 12px 16px; overflow: auto; }
 .topbar { display: flex; align-items: center; justify-content: space-between; }
-.brand { font-weight: 800; color: var(--text-white); font-size: 16px; }
+.brand { font-family: var(--font-pixel); font-weight: 700; color: var(--text-white); font-size: 18px; letter-spacing: 0.02em; }
 .brand small { font-weight: 500; color: var(--text-muted); margin-left: 6px; font-size: 12px; }
 .nav { display: flex; gap: 8px; }
 .navBtn {
-  background: var(--bg-tertiary); color: var(--text-secondary); border: 1px solid var(--border);
-  border-radius: var(--radius-sm); padding: 6px 10px; font-size: 12px; cursor: pointer;
+  font-family: var(--font-pixel); background: var(--bg-card); color: var(--text-secondary); border: 2px solid var(--border-input);
+  border-radius: 4px; padding: 5px 10px; font-size: 13px; cursor: pointer; box-shadow: 2px 2px 0 rgba(58, 42, 30, 0.25);
 }
 .navBtn:hover { background: var(--bg-hover); color: var(--text-white); }
-.hint { font-size: 11px; color: var(--text-muted); text-align: center; }
+.hint { font-family: var(--font-pixel); font-size: 13px; color: var(--text-secondary); text-align: center; }
 
 .panel {
   width: 520px; max-width: 100%; flex-shrink: 0; background: var(--bg-secondary);
-  border-left: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0;
-  box-shadow: -12px 0 32px rgba(0, 0, 0, 0.35);
+  display: flex; flex-direction: column; min-height: 0;
+  margin: 12px 12px 12px 0; border: 3px solid var(--border-input); border-radius: 6px;
+  box-shadow: 6px 6px 0 rgba(58, 42, 30, 0.22);   /* 픽셀 간판처럼 딱딱한 그림자 */
   animation: slideIn 0.22s ease both;
 }
 @keyframes slideIn { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
@@ -23,7 +49,7 @@
 .roomHidden { display: none; }   /* 모바일 시트가 열리면 방은 숨긴다(마운트는 유지 → 미니미 위치 보존) */
 .mobile .roomArea { padding: 10px; }
 .sheet {
-  position: fixed; inset: 0; width: 100%; border-left: 0; z-index: 200;
+  position: fixed; inset: 0; width: 100%; margin: 0; border: 0; border-radius: 0; box-shadow: none; z-index: 200;
   animation: sheetUp 0.24s ease both;
 }
 @keyframes sheetUp { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }

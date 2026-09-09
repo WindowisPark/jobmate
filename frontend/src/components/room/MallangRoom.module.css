@@ -215,3 +215,44 @@
   .idle, .hop, .shadowHop, .glow { animation: none; }
   .me { transition-duration: 0ms !important; }
 }
+
+/* ---------- 방 안 텍스트는 픽셀 폰트 ---------- */
+.pixel .label, .pixel .bubble, .pixel .nameTag, .pixel .confirmBtn, .pixel .confirmCancel { font-family: var(--font-pixel); }
+.pixel .label { font-size: 13px; padding: 3px 9px 4px; border-radius: 4px; border: 2px solid #5a4634; background: #f6eedc; color: #3b2f26; box-shadow: 2px 2px 0 rgba(58, 42, 30, 0.35); }
+.pixel .labelLit { background: #f7d98c; border-color: #8a6a1e; box-shadow: 2px 2px 0 rgba(58, 42, 30, 0.35), 0 0 14px rgba(247, 217, 140, 0.8); }
+.pixel .labelActive { outline: 2px solid #6dae8a; outline-offset: 1px; }
+.pixel .bubble { font-size: 13px; border-radius: 4px; border: 2px solid #5a4634; box-shadow: 2px 2px 0 rgba(58, 42, 30, 0.3); }
+.pixel .bubble::after { bottom: -7px; border-right-width: 2px; border-bottom-width: 2px; border-color: #5a4634; }
+.pixel .bubble b { color: #3f6f95; }
+.pixel .nameTag { font-size: 12px; border-radius: 3px; padding: 1px 6px 2px; }
+
+/* NPC 는 탭 가능 — 스프라이트 위 투명 버튼 */
+.npc { pointer-events: none; }
+.npcHit { pointer-events: auto; background: transparent; border: 0; padding: 0; margin: 0; display: block; width: 100%; cursor: pointer; position: relative; z-index: 1; }
+.npcHit:focus-visible { outline: 2px solid #6dae8a; outline-offset: 2px; border-radius: 6px; }
+
+/* 확인 간판: 도착하면 한 번 더 묻는다 */
+.confirm {
+  position: absolute; z-index: 4000; transform: translate(-50%, -100%); display: flex; align-items: stretch; gap: 0;
+  animation: confirmIn 160ms ease-out both;
+}
+@keyframes confirmIn { from { opacity: 0; transform: translate(-50%, -90%); } to { opacity: 1; transform: translate(-50%, -100%); } }
+.confirmBtn {
+  background: #6dae8a; color: #10231a; border: 2px solid #2f5a44; border-right: 0; border-radius: 4px 0 0 4px;
+  padding: 6px 10px 7px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap;
+  box-shadow: 3px 3px 0 rgba(58, 42, 30, 0.35);
+}
+.confirmBtn:hover { background: #7fc09c; }
+.confirmKey { font-size: 10px; font-weight: 400; opacity: 0.75; margin-left: 6px; border: 1px solid rgba(16, 35, 26, 0.5); padding: 0 4px; border-radius: 3px; }
+.confirmCancel {
+  background: #f6eedc; color: #6f5b48; border: 2px solid #2f5a44; border-radius: 0 4px 4px 0; padding: 6px 9px; cursor: pointer;
+  font-size: 12px; box-shadow: 3px 3px 0 rgba(58, 42, 30, 0.35);
+}
+.confirmCancel:hover { background: #efe3cf; }
+@media (max-width: 640px) {
+  .pixel .label { font-size: 12px; }
+  .confirmBtn { font-size: 12px; padding: 5px 8px 6px; }
+  /* 좁은 화면: 말풍선은 하나만, 준비 중 가구 간판은 숨김 */
+  .bubbleSecondary, .labelSoon { display: none; }
+  .bubble { max-width: 40vw; }
+}

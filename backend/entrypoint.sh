@@ -12,10 +12,10 @@ from app.models.agent_state import Agent
 from sqlalchemy import select
 
 AGENTS = [
-    {'id': 'seo_yeon', 'name': '김서연', 'role': 'Career Coach', 'personality': '따뜻하지만 직설적인 커리어 코치', 'avatar_url': '/assets/agents/seo-yeon.svg'},
-    {'id': 'jun_ho', 'name': '박준호', 'role': 'Job Researcher', 'personality': '데이터 중심의 꼼꼼한 리서처', 'avatar_url': '/assets/agents/jun-ho.svg'},
-    {'id': 'ha_eun', 'name': '이하은', 'role': 'Mental Care', 'personality': '공감 능력이 뛰어난 멘탈 케어 전문가', 'avatar_url': '/assets/agents/ha-eun.svg'},
-    {'id': 'min_su', 'name': '정민수', 'role': 'Industry Mentor', 'personality': '현직자 형/누나 느낌의 멘토', 'avatar_url': '/assets/agents/min-su.svg'},
+    {'id': 'seo_yeon', 'name': '첨삭이', 'role': 'Career Coach', 'personality': '따뜻하지만 직설적인 커리어 코치', 'avatar_url': '/assets/agents/seo-yeon.svg'},
+    {'id': 'jun_ho', 'name': '탐색이', 'role': 'Job Researcher', 'personality': '데이터 중심의 꼼꼼한 리서처', 'avatar_url': '/assets/agents/jun-ho.svg'},
+    {'id': 'ha_eun', 'name': '토닥이', 'role': 'Mental Care', 'personality': '공감 능력이 뛰어난 멘탈 케어 전문가', 'avatar_url': '/assets/agents/ha-eun.svg'},
+    {'id': 'min_su', 'name': '꿀팁이', 'role': 'Industry Mentor', 'personality': '현직자 형/누나 느낌의 멘토', 'avatar_url': '/assets/agents/min-su.svg'},
 ]
 
 async def seed():

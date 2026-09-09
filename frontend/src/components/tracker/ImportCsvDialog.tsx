@@ -76,7 +76,7 @@ export function ImportCsvDialog({ onDone }: { onDone: () => void }) {
               <table className={s.table}>
                 <tbody>
                   {report.errors.slice(0, 20).map((e, i) => (
-                    <tr key={i}><td>{e.row}행</td><td>{e.field ?? ""}</td><td style={{ color: "#ff9a9a" }}>{e.reason}</td></tr>
+                    <tr key={i}><td>{e.row}행</td><td>{e.field ?? ""}</td><td style={{ color: "var(--danger)" }}>{e.reason}</td></tr>
                   ))}
                 </tbody>
               </table>

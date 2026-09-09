@@ -69,7 +69,7 @@ export function Onboarding({ onComplete }: Props) {
       <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 400, margin: "0 auto" }}>
         {[
           { icon: "💬", title: "# general에서 팀 채팅", desc: "메시지를 보내면 팀원들이 함께 응답해요" },
-          { icon: "@", title: "@멘션으로 지목", desc: "@김서연 처럼 특정 멤버를 호출할 수 있어요" },
+          { icon: "@", title: "@멘션으로 지목", desc: "@첨삭이 처럼 특정 멤버를 호출할 수 있어요" },
           { icon: "🔒", title: "1:1 DM", desc: "사이드바에서 이름을 클릭하면 개인 대화가 시작돼요" },
           { icon: "🏢", title: "오피스 뷰", desc: "채팅 위에서 팀원들이 사무실에서 일하는 모습을 볼 수 있어요" },
         ].map((item) => (

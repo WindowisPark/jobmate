@@ -1,4 +1,4 @@
-import { Component, useEffect, useState } from "react";
+import { Component, lazy, Suspense, useEffect, useState } from "react";
 import type { ErrorInfo, ReactNode } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Layout } from "@/components/common/Layout";
@@ -9,6 +9,9 @@ import { useAuthStore } from "@/stores/authStore";
 import { ToastContainer } from "@/components/common/ToastContainer";
 import { api } from "@/utils/api";
 
+
+// M0 렌더링 스파이크 — 개발 빌드에서만. 렌더러 결정 후 spike/와 함께 제거한다.
+const SpikePage = import.meta.env.DEV ? lazy(() => import("./spike/SpikePage")) : null;
 
 function SkeletonBar({ width, height, style }: {
   width: string | number;
@@ -154,6 +157,16 @@ export default function App() {
     <ErrorBoundary>
       <BrowserRouter>
         <Routes>
+          {SpikePage && (
+            <Route
+              path="/spike"
+              element={
+                <Suspense fallback={<div style={{ padding: 24 }}>스파이크 로딩 중…</div>}>
+                  <SpikePage />
+                </Suspense>
+              }
+            />
+          )}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route

@@ -1,0 +1,2 @@
+bg.png · slime_*.png — Kenney Roguelike RPG / Roguelike Indoors / Tiny Dungeon, CC0 1.0 (https://kenney.nl)
+blob_*.png — 이 저장소에서 그림 (scripts/pixel-room/build.py)

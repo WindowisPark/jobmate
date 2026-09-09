@@ -12,9 +12,7 @@ class JobPreference(Base):
     __tablename__ = "user_job_preferences"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("users.id"), nullable=False, index=True
-    )
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     job_field: Mapped[str | None] = mapped_column(String(100))
     location: Mapped[str | None] = mapped_column(String(100))
     career_level: Mapped[str | None] = mapped_column(String(50))
@@ -23,8 +21,6 @@ class JobPreference(Base):
     company_size: Mapped[str | None] = mapped_column(String(50))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(
-        default=datetime.utcnow, onupdate=datetime.utcnow
-    )
+    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
 
     user: Mapped["User"] = relationship()  # noqa: F821

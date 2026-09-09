@@ -43,6 +43,7 @@ class UserOut(BaseModel):
     email: str
     nickname: str
     avatar_url: str | None = None
+    is_guest: bool = False
     created_at: datetime
 
 

@@ -10,9 +10,7 @@ from app.models.user import Base
 
 class Message(Base):
     __tablename__ = "messages"
-    __table_args__ = (
-        CheckConstraint("sender_type IN ('user', 'agent')", name="ck_sender_type"),
-    )
+    __table_args__ = (CheckConstraint("sender_type IN ('user', 'agent')", name="ck_sender_type"),)
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     conversation_id: Mapped[uuid.UUID] = mapped_column(

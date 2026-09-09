@@ -20,14 +20,10 @@ class Agent(Base):
 
 class UserEmotionLog(Base):
     __tablename__ = "user_emotion_logs"
-    __table_args__ = (
-        CheckConstraint("intensity BETWEEN 1 AND 5", name="ck_intensity_range"),
-    )
+    __table_args__ = (CheckConstraint("intensity BETWEEN 1 AND 5", name="ck_intensity_range"),)
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("users.id"), nullable=False, index=True
-    )
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     conversation_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("conversations.id"))
     emotion: Mapped[str] = mapped_column(String(20), nullable=False)
     intensity: Mapped[int] = mapped_column(SmallInteger, nullable=False)

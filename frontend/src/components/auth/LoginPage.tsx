@@ -2,12 +2,12 @@ import { FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "@/utils/api";
 import { useAuthStore } from "@/stores/authStore";
+import type { UserInfo } from "@/stores/authStore";
 import styles from "./Auth.module.css";
 
 export function LoginPage() {
   const navigate = useNavigate();
   const setUser = useAuthStore((s) => s.setUser);
-  const setGuest = useAuthStore((s) => s.setGuest);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,12 +20,7 @@ export function LoginPage() {
     setLoading(true);
 
     try {
-      const user = await api.post<{
-        id: string;
-        email: string;
-        nickname: string;
-        avatar_url: string | null;
-      }>("/auth/login", { email, password });
+      const user = await api.post<UserInfo>("/auth/login", { email, password });
 
       setUser(user);
       navigate("/");
@@ -36,9 +31,19 @@ export function LoginPage() {
     }
   };
 
-  const handleGuest = () => {
-    setGuest();
-    navigate("/");
+  const handleGuest = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      // 게스트도 서버 계정을 받는다 — 지원 내역 등 개인 데이터가 다른 게스트와 섞이지 않게
+      const user = await api.post<UserInfo>("/auth/guest");
+      setUser(user);
+      navigate("/");
+    } catch (err: any) {
+      setError(err.message || "게스트 시작에 실패했습니다");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -76,7 +81,7 @@ export function LoginPage() {
           <span>또는</span>
         </div>
 
-        <button onClick={handleGuest} className={styles.guestButton}>
+        <button onClick={handleGuest} className={styles.guestButton} disabled={loading}>
           게스트로 체험하기
         </button>
 

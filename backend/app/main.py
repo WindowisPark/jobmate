@@ -1,13 +1,13 @@
 import logging
-from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.api.routes import applications, auth, chat, companies, jobs, rooms, users
 from app.config import settings
-from app.api.routes import auth, chat, jobs, rooms, users
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -51,6 +51,10 @@ app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(rooms.router, prefix="/api/conversations", tags=["conversations"])
 app.include_router(jobs.router, prefix="/api/jobs", tags=["jobs"])
+app.include_router(applications.router, prefix="/api/applications", tags=["applications"])
+app.include_router(companies.companies, prefix="/api/companies", tags=["companies"])
+app.include_router(companies.tracks, prefix="/api/tracks", tags=["tracks"])
+app.include_router(companies.documents, prefix="/api/documents", tags=["documents"])
 app.include_router(chat.router, prefix="/ws", tags=["chat"])
 
 

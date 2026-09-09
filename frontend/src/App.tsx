@@ -145,7 +145,7 @@ export default function App() {
   useEffect(() => {
     // 페이지 로드 시 쿠키로 인증 상태 확인
     api
-      .get<{ id: string; email: string; nickname: string; avatar_url: string | null }>("/auth/me")
+      .get<{ id: string; email: string; nickname: string; avatar_url: string | null; is_guest?: boolean }>("/auth/me")
       .then((user) => setUser(user))
       .catch(() => {
         // 쿠키 없음 → 미인증 상태로 유지

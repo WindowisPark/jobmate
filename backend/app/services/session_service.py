@@ -13,10 +13,12 @@ class SessionService:
         await self._redis.setex(
             key,
             86400,  # 24h TTL
-            json.dumps({
-                "user_id": str(user_id),
-                "active_conversation_id": str(conversation_id),
-            }),
+            json.dumps(
+                {
+                    "user_id": str(user_id),
+                    "active_conversation_id": str(conversation_id),
+                }
+            ),
         )
 
     async def get_session(self, user_id: UUID) -> dict | None:

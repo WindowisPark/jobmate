@@ -30,13 +30,22 @@ async def mock_interview(
     raw = await generate_response(SYSTEM_PROMPT, user_msg)
 
     try:
-        cleaned = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        cleaned = (
+            raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        )
         return json.loads(cleaned)
     except (json.JSONDecodeError, KeyError):
         return {
             "questions": [
                 {"question": "자기소개를 해주세요.", "category": "기본", "tip": "1분 내로 핵심만"},
-                {"question": f"{job_title} 직무에 지원한 이유는?", "category": "동기", "tip": "구체적 경험 연결"},
+                {
+                    "question": f"{job_title} 직무에 지원한 이유는?",
+                    "category": "동기",
+                    "tip": "구체적 경험 연결",
+                },
             ],
-            "general_tips": ["면접 전 회사에 대해 충분히 조사하세요", "STAR 기법으로 답변을 구조화하세요"],
+            "general_tips": [
+                "면접 전 회사에 대해 충분히 조사하세요",
+                "STAR 기법으로 답변을 구조화하세요",
+            ],
         }

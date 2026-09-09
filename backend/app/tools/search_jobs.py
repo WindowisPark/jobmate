@@ -38,6 +38,7 @@ def _random_headers() -> dict[str, str]:
 # 캐시
 # ---------------------------------------------------------------------------
 
+
 def _build_query_hash(keywords: list[str], location: str | None, career_level: str) -> str:
     normalized = json.dumps(
         {"keywords": sorted(keywords), "location": location, "career_level": career_level},
@@ -88,14 +89,13 @@ async def _save_cache(
     )
     db.add(cache_entry)
 
-    await db.execute(
-        delete(JobCache).where(JobCache.expires_at <= datetime.utcnow())
-    )
+    await db.execute(delete(JobCache).where(JobCache.expires_at <= datetime.utcnow()))
 
 
 # ---------------------------------------------------------------------------
 # 메인 검색 함수
 # ---------------------------------------------------------------------------
+
 
 async def search_jobs(
     keywords: list[str],
@@ -128,7 +128,9 @@ async def search_jobs(
     # 2. 사람인 (HTML 스크래핑 — 보조)
     if len(jobs) < limit:
         try:
-            saramin_jobs = await _search_saramin(keywords, location, career_level, limit - len(jobs))
+            saramin_jobs = await _search_saramin(
+                keywords, location, career_level, limit - len(jobs)
+            )
             jobs.extend(saramin_jobs)
         except Exception as e:
             logger.warning(f"사람인 스크래핑 실패: {e}")
@@ -257,9 +259,7 @@ async def save_job_preferences(
         if updates:
             updates["updated_at"] = datetime.utcnow()
             await db.execute(
-                sa_update(JobPreference)
-                .where(JobPreference.id == existing.id)
-                .values(**updates)
+                sa_update(JobPreference).where(JobPreference.id == existing.id).values(**updates)
             )
 
         return {
@@ -382,16 +382,18 @@ async def _search_wanted(
         if reward.get("formatted_total"):
             reward_text = f"추천보상금 {reward['formatted_total']}"
 
-        jobs.append({
-            "title": title,
-            "company": company_name,
-            "location": job_location or "",
-            "career": career_level,
-            "salary": reward_text,
-            "url": f"https://www.wanted.co.kr/wd/{item.get('id', '')}",
-            "source": "원티드",
-            "logo": company.get("application_response_stats", {}).get("avg_rate", ""),
-        })
+        jobs.append(
+            {
+                "title": title,
+                "company": company_name,
+                "location": job_location or "",
+                "career": career_level,
+                "salary": reward_text,
+                "url": f"https://www.wanted.co.kr/wd/{item.get('id', '')}",
+                "source": "원티드",
+                "logo": company.get("application_response_stats", {}).get("avg_rate", ""),
+            }
+        )
 
         if len(jobs) >= limit:
             break
@@ -400,15 +402,17 @@ async def _search_wanted(
     if not jobs and data.get("data"):
         for item in data["data"][:limit]:
             company = item.get("company", {})
-            jobs.append({
-                "title": item.get("position", ""),
-                "company": company.get("name", "미공개"),
-                "location": item.get("address", {}).get("full_location", ""),
-                "career": career_level,
-                "salary": "",
-                "url": f"https://www.wanted.co.kr/wd/{item.get('id', '')}",
-                "source": "원티드",
-            })
+            jobs.append(
+                {
+                    "title": item.get("position", ""),
+                    "company": company.get("name", "미공개"),
+                    "location": item.get("address", {}).get("full_location", ""),
+                    "career": career_level,
+                    "salary": "",
+                    "url": f"https://www.wanted.co.kr/wd/{item.get('id', '')}",
+                    "source": "원티드",
+                }
+            )
 
     return jobs
 
@@ -488,21 +492,23 @@ async def _search_saramin(
 
         # 조건 (지역, 경력, 학력, 고용형태)
         conditions = []
-        for cond_m in re.finditer(r'<span[^>]*>(.*?)</span>', block):
+        for cond_m in re.finditer(r"<span[^>]*>(.*?)</span>", block):
             text = _strip_html(cond_m.group(1)).strip()
             if text and len(text) < 30:
                 conditions.append(text)
 
         if title:
-            jobs.append({
-                "title": title,
-                "company": company or "미공개",
-                "location": conditions[0] if conditions else "",
-                "career": conditions[1] if len(conditions) > 1 else "",
-                "salary": "",
-                "url": url,
-                "source": "사람인",
-            })
+            jobs.append(
+                {
+                    "title": title,
+                    "company": company or "미공개",
+                    "location": conditions[0] if conditions else "",
+                    "career": conditions[1] if len(conditions) > 1 else "",
+                    "salary": "",
+                    "url": url,
+                    "source": "사람인",
+                }
+            )
 
         if len(jobs) >= limit:
             break

@@ -1,7 +1,8 @@
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from passlib.context import CryptContext
+from pydantic import BaseModel, EmailStr
 from redis.asyncio import Redis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,13 +10,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.dependencies import get_db, get_redis
 from app.models.user import User
-from pydantic import BaseModel, EmailStr
-
 from app.schemas.user import UserCreate, UserLogin, UserOut
 
 
 class EmailCheck(BaseModel):
     email: EmailStr
+
+
 from app.api.middleware.auth import (
     create_access_token,
     create_refresh_token,
@@ -30,9 +31,20 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 COOKIE_OPTS: dict = {
     "httponly": True,
-    "samesite": "lax",
-    "secure": False,  # dev: False, prod: True
+    "samesite": settings.cookie_samesite,
+    "secure": settings.cookie_secure,  # env JOBMATE_COOKIE_SECURE=true (prod)
 }
+
+
+def _user_out(user: User) -> UserOut:
+    return UserOut(
+        id=user.id,
+        email=user.email,
+        nickname=user.nickname,
+        avatar_url=user.avatar_url,
+        is_guest=user.is_guest,
+        created_at=user.created_at,
+    )
 
 
 def _set_auth_cookies(response: Response, access: str, refresh: str) -> None:
@@ -95,13 +107,34 @@ async def register(
     await save_refresh_token(redis, user.id, refresh)
     _set_auth_cookies(response, access, refresh)
 
-    return UserOut(
-        id=user.id,
-        email=user.email,
-        nickname=user.nickname,
-        avatar_url=user.avatar_url,
-        created_at=user.created_at,
+    return _user_out(user)
+
+
+@router.post("/guest", response_model=UserOut)
+async def guest_login(
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
+) -> UserOut:
+    """게스트도 진짜 users 행 + 같은 JWT 쿠키.
+
+    예전 '공유 anonymous 유저'는 모든 게스트의 데이터가 섞여 폐기했다.
+    """
+    user = User(
+        email=f"guest-{uuid4()}@guest.local",
+        password_hash="!guest",  # 로그인 불가 마커 — bcrypt 해시가 아니라 verify 가 항상 실패
+        nickname="게스트",
+        is_guest=True,
     )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+
+    access = create_access_token(user.id)
+    refresh = create_refresh_token(user.id)
+    await save_refresh_token(redis, user.id, refresh)
+    _set_auth_cookies(response, access, refresh)
+    return _user_out(user)
 
 
 @router.post("/login", response_model=UserOut)
@@ -115,7 +148,7 @@ async def login(
     result = await db.execute(select(User).where(User.email == body.email))
     user = result.scalar_one_or_none()
 
-    if not user or not pwd_context.verify(body.password, user.password_hash):
+    if not user or user.is_guest or not pwd_context.verify(body.password, user.password_hash):
         raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 올바르지 않습니다")
 
     access = create_access_token(user.id)
@@ -123,13 +156,7 @@ async def login(
     await save_refresh_token(redis, user.id, refresh)
     _set_auth_cookies(response, access, refresh)
 
-    return UserOut(
-        id=user.id,
-        email=user.email,
-        nickname=user.nickname,
-        avatar_url=user.avatar_url,
-        created_at=user.created_at,
-    )
+    return _user_out(user)
 
 
 @router.post("/refresh", response_model=UserOut)
@@ -153,7 +180,9 @@ async def refresh_token(
     if not await verify_refresh_token(redis, user_id, token):
         await revoke_refresh_token(redis, user_id)
         _clear_auth_cookies(response)
-        raise HTTPException(status_code=401, detail="Refresh token이 재사용되었습니다. 다시 로그인해주세요.")
+        raise HTTPException(
+            status_code=401, detail="Refresh token이 재사용되었습니다. 다시 로그인해주세요."
+        )
 
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
@@ -165,13 +194,7 @@ async def refresh_token(
     await save_refresh_token(redis, user.id, new_refresh)
     _set_auth_cookies(response, new_access, new_refresh)
 
-    return UserOut(
-        id=user.id,
-        email=user.email,
-        nickname=user.nickname,
-        avatar_url=user.avatar_url,
-        created_at=user.created_at,
-    )
+    return _user_out(user)
 
 
 @router.post("/logout")
@@ -201,6 +224,7 @@ async def get_me(
 ) -> UserOut:
     """현재 로그인된 유저 정보 반환. 쿠키 유효성 검증용으로도 사용."""
     from app.api.middleware.auth import get_current_user_id
+
     user_id = await get_current_user_id(request)
 
     result = await db.execute(select(User).where(User.id == user_id))
@@ -208,10 +232,4 @@ async def get_me(
     if not user:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
 
-    return UserOut(
-        id=user.id,
-        email=user.email,
-        nickname=user.nickname,
-        avatar_url=user.avatar_url,
-        created_at=user.created_at,
-    )
+    return _user_out(user)

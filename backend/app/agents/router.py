@@ -39,7 +39,9 @@ async def analyze_emotion(state: JobMateState) -> dict:
 
     try:
         # JSON 파싱 (```json ... ``` 래핑 제거)
-        cleaned = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        cleaned = (
+            raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        )
         result = json.loads(cleaned)
         return {
             "emotion": result.get("emotion", "neutral"),

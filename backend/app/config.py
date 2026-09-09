@@ -5,6 +5,11 @@ class Settings(BaseSettings):
     app_name: str = "JobMate"
     debug: bool = False
 
+    # Web (env: JOBMATE_CORS_ORIGINS='["https://app.example.com"]')
+    cors_origins: list[str] = ["http://localhost:5173"]
+    cookie_secure: bool = False  # prod: True
+    cookie_samesite: str = "lax"
+
     # Database
     database_url: str = "postgresql+asyncpg://jobmate:jobmate@localhost:5432/jobmate"
 

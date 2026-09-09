@@ -1,7 +1,8 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import select, update as sa_update
+from sqlalchemy import select
+from sqlalchemy import update as sa_update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,69 +11,58 @@ from app.agents.state import JobMateState
 from app.models.conversation import Conversation
 from app.models.job_preference import JobPreference
 from app.models.message import Message
-from app.models.user import User
-
-# JWT 구현 전까지 사용할 anonymous 유저 고정 ID
-ANONYMOUS_USER_ID = uuid.uuid5(uuid.NAMESPACE_URL, "anonymous")
 
 
-async def ensure_anonymous_user(db: AsyncSession) -> uuid.UUID:
-    """anonymous 유저가 없으면 생성한다. JWT 인증 구현 후 제거."""
-    result = await db.execute(
-        select(User).where(User.id == ANONYMOUS_USER_ID)
-    )
-    if result.scalar_one_or_none() is None:
-        user = User(
-            id=ANONYMOUS_USER_ID,
-            email="anonymous@jobmate.local",
-            password_hash="no-auth",
-            nickname="취준생",
-        )
-        db.add(user)
-        await db.flush()
-    return ANONYMOUS_USER_ID
+def room_uuid(conversation_id: str, user_id: uuid.UUID) -> uuid.UUID:
+    """프런트의 정적 방 id("general", "dm-jun_ho")를 유저별 UUID 로.
+
+    예전엔 uuid5("general") 하나로 모든 유저가 같은 대화방을 공유했다(user_id 인자를 무시). 이제 유저 네임스페이스를 섞는다.
+    """
+    try:
+        return uuid.UUID(conversation_id)
+    except ValueError:
+        return uuid.uuid5(uuid.NAMESPACE_URL, f"{user_id}:{conversation_id}")
 
 
 async def get_or_create_conversation(
     db: AsyncSession,
     conversation_id: str,
-    user_id: str,
+    user_id: str | uuid.UUID,
 ) -> Conversation:
     """conversation_id로 대화를 조회하거나, 없으면 새로 생성한다.
 
-    INSERT...ON CONFLICT DO NOTHING 패턴으로 race condition을 방지한다.
+    INSERT...ON CONFLICT DO NOTHING 패턴으로 race condition을 방지한다. 소유자는 항상 user_id.
     """
-    try:
-        conv_uuid = uuid.UUID(conversation_id)
-    except ValueError:
-        conv_uuid = uuid.uuid5(uuid.NAMESPACE_URL, conversation_id)
+    user_uuid = user_id if isinstance(user_id, uuid.UUID) else uuid.UUID(str(user_id))
+    conv_uuid = room_uuid(conversation_id, user_uuid)
 
-    # 먼저 조회 시도 (대부분의 경우 이미 존재)
+    # 먼저 조회 시도 (대부분의 경우 이미 존재) — 소유자 검사 포함
     result = await db.execute(
-        select(Conversation).where(Conversation.id == conv_uuid)
+        select(Conversation).where(Conversation.id == conv_uuid, Conversation.user_id == user_uuid)
     )
     conv = result.scalar_one_or_none()
     if conv is not None:
         return conv
 
     # 없으면 UPSERT로 안전하게 생성
-    user_uuid = await ensure_anonymous_user(db)
     now = datetime.utcnow()
 
-    stmt = pg_insert(Conversation).values(
-        id=conv_uuid,
-        user_id=user_uuid,
-        title=None,
-        created_at=now,
-        updated_at=now,
-    ).on_conflict_do_nothing(index_elements=["id"])
+    stmt = (
+        pg_insert(Conversation)
+        .values(
+            id=conv_uuid,
+            user_id=user_uuid,
+            title=None,
+            created_at=now,
+            updated_at=now,
+        )
+        .on_conflict_do_nothing(index_elements=["id"])
+    )
     await db.execute(stmt)
     await db.flush()
 
     # INSERT 성공 또는 충돌 무시 후, 확정된 행을 다시 조회
-    result = await db.execute(
-        select(Conversation).where(Conversation.id == conv_uuid)
-    )
+    result = await db.execute(select(Conversation).where(Conversation.id == conv_uuid))
     return result.scalar_one()
 
 
@@ -152,17 +142,21 @@ async def load_conversation_history(
     history: list[dict] = []
     for msg in rows:
         if msg.sender_type == "user":
-            history.append({
-                "role": "user",
-                "content": msg.content,
-            })
+            history.append(
+                {
+                    "role": "user",
+                    "content": msg.content,
+                }
+            )
         else:
             # 에이전트 이름을 포함해서 누가 말했는지 구분
-            history.append({
-                "role": "assistant",
-                "content": msg.content,
-                "agent_id": msg.agent_id,
-            })
+            history.append(
+                {
+                    "role": "assistant",
+                    "content": msg.content,
+                    "agent_id": msg.agent_id,
+                }
+            )
 
     return history
 

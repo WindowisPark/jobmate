@@ -7,10 +7,9 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.middleware.auth import get_current_user_id, get_optional_user_id
+from app.api.middleware.auth import get_current_user_id
 from app.dependencies import get_db
 from app.models.job_preference import JobPreference
-from app.services.chat_service import ANONYMOUS_USER_ID, ensure_anonymous_user
 from app.tools.search_jobs import search_jobs_with_preferences
 
 router = APIRouter()
@@ -36,18 +35,14 @@ class JobPreferenceResponse(BaseModel):
     is_active: bool
 
 
-async def _resolve_user_id(
-    user_id: UUID | None, db: AsyncSession
-) -> UUID:
-    """인증된 유저 또는 anonymous 유저 ID를 반환."""
-    if user_id:
-        return user_id
-    return await ensure_anonymous_user(db)
+async def _resolve_user_id(user_id: UUID, db: AsyncSession) -> UUID:  # noqa: ARG001
+    """게스트도 진짜 계정이므로 그대로. (예전 anonymous 공유 유저 폴백 제거)"""
+    return user_id
 
 
 @router.get("/preferences")
 async def get_preferences(
-    user_id: UUID | None = Depends(get_optional_user_id),
+    user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     uid = await _resolve_user_id(user_id, db)
@@ -77,7 +72,7 @@ async def get_preferences(
 @router.put("/preferences")
 async def update_preferences(
     body: JobPreferenceUpdate,
-    user_id: UUID | None = Depends(get_optional_user_id),
+    user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     uid = await _resolve_user_id(user_id, db)
@@ -121,12 +116,10 @@ async def update_preferences(
 
 @router.post("/refresh")
 async def refresh_jobs(
-    user_id: UUID | None = Depends(get_optional_user_id),
+    user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     uid = await _resolve_user_id(user_id, db)
-    result = await search_jobs_with_preferences(
-        db, str(uid), limit=10, force_refresh=True
-    )
+    result = await search_jobs_with_preferences(db, str(uid), limit=10, force_refresh=True)
     await db.commit()
     return result

@@ -28,7 +28,9 @@ async def analyze_market(
     raw = await generate_response(SYSTEM_PROMPT, user_msg)
 
     try:
-        cleaned = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        cleaned = (
+            raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        )
         return json.loads(cleaned)
     except (json.JSONDecodeError, KeyError):
         return {

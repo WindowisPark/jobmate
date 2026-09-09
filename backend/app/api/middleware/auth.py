@@ -38,7 +38,9 @@ def decode_token(token: str) -> dict:
         )
         return payload
     except JWTError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="유효하지 않은 토큰입니다")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="유효하지 않은 토큰입니다"
+        )
 
 
 # --- Redis Refresh Token 관리 ---
@@ -71,6 +73,7 @@ async def revoke_refresh_token(redis: Redis, user_id: UUID) -> None:
 
 
 # --- FastAPI Dependencies ---
+
 
 async def get_current_user_id(request: Request) -> UUID:
     """쿠키에서 access_token을 읽어 user_id를 반환한다."""

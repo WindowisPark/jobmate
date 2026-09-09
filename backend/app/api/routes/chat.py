@@ -28,18 +28,17 @@ GRAPH_TIMEOUT = 60  # seconds
 MAX_MESSAGE_LENGTH = 2000
 
 # 에이전트 이름 → ID 매핑
-AGENT_NAME_TO_ID = {
-    profile["name"]: agent_id
-    for agent_id, profile in AGENT_PROFILES.items()
-}
+AGENT_NAME_TO_ID = {profile["name"]: agent_id for agent_id, profile in AGENT_PROFILES.items()}
 MENTION_PATTERN = re.compile(r"@(" + "|".join(AGENT_NAME_TO_ID.keys()) + r")")
 
 # 에이전트 모듈 캐시 (매번 import 방지)
-from app.agents.nodes import seo_yeon, jun_ho, ha_eun, min_su  # noqa: E402
+from app.agents.nodes import ha_eun, jun_ho, min_su, seo_yeon  # noqa: E402
 
 _AGENT_MODULES = {
-    "seo_yeon": seo_yeon, "jun_ho": jun_ho,
-    "ha_eun": ha_eun, "min_su": min_su,
+    "seo_yeon": seo_yeon,
+    "jun_ho": jun_ho,
+    "ha_eun": ha_eun,
+    "min_su": min_su,
 }
 
 # 도구명 → 오피스 액션 매핑
@@ -90,9 +89,12 @@ async def websocket_chat(websocket: WebSocket, conversation_id: str) -> None:
     await websocket.accept()
     graph = build_graph()
 
-    # 쿠키에서 user_id 추출 (없으면 게스트)
+    # 쿠키의 user_id — 게스트도 /api/auth/guest 로 계정을 받으므로 없으면 연결을 끊는다
     ws_user_id = get_ws_user_id(websocket)
-    user_id_str = str(ws_user_id) if ws_user_id else "anonymous"
+    if ws_user_id is None:
+        await websocket.close(code=4401, reason="로그인이 필요합니다")
+        return
+    user_id_str = str(ws_user_id)
 
     try:
         while True:
@@ -107,10 +109,13 @@ async def websocket_chat(websocket: WebSocket, conversation_id: str) -> None:
 
             # 메시지 길이 제한
             if len(user_message) > MAX_MESSAGE_LENGTH:
-                await _safe_send(websocket, {
-                    "type": "error",
-                    "message": f"메시지는 {MAX_MESSAGE_LENGTH}자 이내로 입력해주세요.",
-                })
+                await _safe_send(
+                    websocket,
+                    {
+                        "type": "error",
+                        "message": f"메시지는 {MAX_MESSAGE_LENGTH}자 이내로 입력해주세요.",
+                    },
+                )
                 continue
 
             try:
@@ -118,7 +123,9 @@ async def websocket_chat(websocket: WebSocket, conversation_id: str) -> None:
                 target_agent = data.get("target_agent")
                 mentioned_agents = parse_mentions(user_message)
 
-                logger.info(f"Message: {user_message[:50]} | mode={chat_mode} | mentions={mentioned_agents}")
+                logger.info(
+                    f"Message: {user_message[:50]} | mode={chat_mode} | mentions={mentioned_agents}"
+                )
 
                 # --- Phase 1: 유저 메시지 저장 + 컨텍스트 로드 (짧은 트랜잭션) ---
                 async with async_session() as db:
@@ -135,37 +142,44 @@ async def websocket_chat(websocket: WebSocket, conversation_id: str) -> None:
                 # --- Phase 2: LangGraph 실행 (트랜잭션 외부) ---
                 try:
                     result = await asyncio.wait_for(
-                        graph.ainvoke({
-                            "messages": [],
-                            "user_message": user_message,
-                            "conversation_history": history,
-                            "emotion": "",
-                            "emotion_intensity": 0,
-                            "intent": "",
-                            "active_agents": [],
-                            "agent_responses": [],
-                            "conversation_id": conversation_id,
-                            "user_id": user_id_str,
-                            "user_preferences": preferences,
-                            "emotion_history_summary": emotion_summary,
-                            "task_plan": [],
-                            "step_results": {},
-                            "current_step": 0,
-                        }),
+                        graph.ainvoke(
+                            {
+                                "messages": [],
+                                "user_message": user_message,
+                                "conversation_history": history,
+                                "emotion": "",
+                                "emotion_intensity": 0,
+                                "intent": "",
+                                "active_agents": [],
+                                "agent_responses": [],
+                                "conversation_id": conversation_id,
+                                "user_id": user_id_str,
+                                "user_preferences": preferences,
+                                "emotion_history_summary": emotion_summary,
+                                "task_plan": [],
+                                "step_results": {},
+                                "current_step": 0,
+                            }
+                        ),
                         timeout=GRAPH_TIMEOUT,
                     )
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     logger.error(f"Graph execution timed out ({GRAPH_TIMEOUT}s)")
-                    await _safe_send(websocket, {
-                        "type": "error",
-                        "message": "응답 생성 시간이 초과되었습니다. 다시 시도해주세요.",
-                    })
+                    await _safe_send(
+                        websocket,
+                        {
+                            "type": "error",
+                            "message": "응답 생성 시간이 초과되었습니다. 다시 시도해주세요.",
+                        },
+                    )
                     continue
 
                 responses = result.get("agent_responses", [])
                 emotion = result.get("emotion", "")
                 emotion_intensity = result.get("emotion_intensity", 0)
-                logger.info(f"Graph returned {len(responses)} responses: {[r['agent_id'] for r in responses]}")
+                logger.info(
+                    f"Graph returned {len(responses)} responses: {[r['agent_id'] for r in responses]}"
+                )
 
                 # DM 모드
                 if chat_mode == "dm" and target_agent:
@@ -203,8 +217,11 @@ async def websocket_chat(websocket: WebSocket, conversation_id: str) -> None:
                     # 감정 로그 저장
                     if emotion:
                         await save_emotion_log(
-                            db, user_id_str, conversation_id,
-                            emotion, emotion_intensity,
+                            db,
+                            user_id_str,
+                            conversation_id,
+                            emotion,
+                            emotion_intensity,
                             context=user_message[:100],
                         )
 
@@ -232,50 +249,65 @@ async def websocket_chat(websocket: WebSocket, conversation_id: str) -> None:
 
                     # 실제 동작에 연동된 오피스 액션 전송
                     office_action = _get_office_action_for_response(resp)
-                    await _safe_send(websocket, {
-                        "type": "agent_typing",
-                        "agent_id": agent_id,
-                        "office_action": office_action,
-                    })
+                    await _safe_send(
+                        websocket,
+                        {
+                            "type": "agent_typing",
+                            "agent_id": agent_id,
+                            "office_action": office_action,
+                        },
+                    )
 
                     await asyncio.sleep(0.5)
 
                     # tool_result 이벤트 전송 (도구 결과가 있을 때)
                     if tool_calls:
                         for tc in tool_calls:
-                            await _safe_send(websocket, {
-                                "type": "tool_result",
-                                "agent_id": agent_id,
-                                "tool_name": tc["name"],
-                                "data": tc.get("result", {}),
-                            })
+                            await _safe_send(
+                                websocket,
+                                {
+                                    "type": "tool_result",
+                                    "agent_id": agent_id,
+                                    "tool_name": tc["name"],
+                                    "data": tc.get("result", {}),
+                                },
+                            )
 
-                    await _safe_send(websocket, {
-                        "type": "agent_message_chunk",
-                        "agent_id": agent_id,
-                        "chunk": content,
-                        "is_final": True,
-                    })
+                    await _safe_send(
+                        websocket,
+                        {
+                            "type": "agent_message_chunk",
+                            "agent_id": agent_id,
+                            "chunk": content,
+                            "is_final": True,
+                        },
+                    )
 
                 # idle 복귀 + 감정 상태 전송
-                await _safe_send(websocket, {
-                    "type": "office_state",
-                    "agents": {
-                        aid: {
-                            "action": "idle",
-                            "position": AGENT_PROFILES[aid]["office_position"],
-                        }
-                        for aid in AGENT_PROFILES
+                await _safe_send(
+                    websocket,
+                    {
+                        "type": "office_state",
+                        "agents": {
+                            aid: {
+                                "action": "idle",
+                                "position": AGENT_PROFILES[aid]["office_position"],
+                            }
+                            for aid in AGENT_PROFILES
+                        },
+                        "emotion": emotion,
                     },
-                    "emotion": emotion,
-                })
+                )
 
             except Exception as e:
                 logger.error(f"Error processing message: {e}\n{traceback.format_exc()}")
-                await _safe_send(websocket, {
-                    "type": "error",
-                    "message": "메시지 처리 중 오류가 발생했습니다. 다시 시도해주세요.",
-                })
+                await _safe_send(
+                    websocket,
+                    {
+                        "type": "error",
+                        "message": "메시지 처리 중 오류가 발생했습니다. 다시 시도해주세요.",
+                    },
+                )
 
     except WebSocketDisconnect:
         logger.info(f"WebSocket disconnected: {conversation_id}")

@@ -22,7 +22,10 @@ async def run(state: JobMateState, is_primary: bool = True) -> AgentResponse:
         context += "너는 보조 역할이야. 짧게 한마디만 덧붙여줘 (1~2문장).\n"
 
     if state.get("emotion_intensity", 0) >= 4 and state.get("emotion") in (
-        "anxious", "depressed", "angry", "frustrated"
+        "anxious",
+        "depressed",
+        "angry",
+        "frustrated",
     ):
         context += "사용자가 매우 힘든 상태야. 공감을 먼저 하고, 호흡 운동을 제안해줘.\n"
 
@@ -31,7 +34,9 @@ async def run(state: JobMateState, is_primary: bool = True) -> AgentResponse:
     if emotion_summary:
         context += f"\n{emotion_summary}\n"
 
-    context += "필요한 경우 도구를 사용해서 정확한 정보를 제공해. 도구 결과를 자연스럽게 설명해줘.\n"
+    context += (
+        "필요한 경우 도구를 사용해서 정확한 정보를 제공해. 도구 결과를 자연스럽게 설명해줘.\n"
+    )
 
     system = profile["system_prompt"] + "\n\n" + context
     tools = get_tools_for_agent(profile["tools"]) if is_primary else []

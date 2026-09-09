@@ -22,23 +22,86 @@ class TaskStep(TypedDict):
 # 단순 의도에 대한 Fast-path (LLM 호출 없이 바로 계획 생성)
 FAST_PATH_ROUTING: dict[str, list[TaskStep]] = {
     "resume_interview": [
-        {"step_id": 0, "agent_id": "seo_yeon", "role": "primary", "action_hint": "resume_or_interview", "depends_on": [], "tool_hint": None},
-        {"step_id": 1, "agent_id": "min_su", "role": "assist", "action_hint": "encouragement", "depends_on": [], "tool_hint": None},
+        {
+            "step_id": 0,
+            "agent_id": "seo_yeon",
+            "role": "primary",
+            "action_hint": "resume_or_interview",
+            "depends_on": [],
+            "tool_hint": None,
+        },
+        {
+            "step_id": 1,
+            "agent_id": "min_su",
+            "role": "assist",
+            "action_hint": "encouragement",
+            "depends_on": [],
+            "tool_hint": None,
+        },
     ],
     "job_search": [
-        {"step_id": 0, "agent_id": "jun_ho", "role": "primary", "action_hint": "search_jobs", "depends_on": [], "tool_hint": "search_jobs"},
-        {"step_id": 1, "agent_id": "seo_yeon", "role": "assist", "action_hint": "career_tip", "depends_on": [], "tool_hint": None},
+        {
+            "step_id": 0,
+            "agent_id": "jun_ho",
+            "role": "primary",
+            "action_hint": "search_jobs",
+            "depends_on": [],
+            "tool_hint": "search_jobs",
+        },
+        {
+            "step_id": 1,
+            "agent_id": "seo_yeon",
+            "role": "assist",
+            "action_hint": "career_tip",
+            "depends_on": [],
+            "tool_hint": None,
+        },
     ],
     "mental_care": [
-        {"step_id": 0, "agent_id": "ha_eun", "role": "primary", "action_hint": "emotional_support", "depends_on": [], "tool_hint": None},
-        {"step_id": 1, "agent_id": "min_su", "role": "assist", "action_hint": "encouragement", "depends_on": [], "tool_hint": None},
+        {
+            "step_id": 0,
+            "agent_id": "ha_eun",
+            "role": "primary",
+            "action_hint": "emotional_support",
+            "depends_on": [],
+            "tool_hint": None,
+        },
+        {
+            "step_id": 1,
+            "agent_id": "min_su",
+            "role": "assist",
+            "action_hint": "encouragement",
+            "depends_on": [],
+            "tool_hint": None,
+        },
     ],
     "career_advice": [
-        {"step_id": 0, "agent_id": "min_su", "role": "primary", "action_hint": "career_advice", "depends_on": [], "tool_hint": None},
-        {"step_id": 1, "agent_id": "seo_yeon", "role": "assist", "action_hint": "practical_tip", "depends_on": [], "tool_hint": None},
+        {
+            "step_id": 0,
+            "agent_id": "min_su",
+            "role": "primary",
+            "action_hint": "career_advice",
+            "depends_on": [],
+            "tool_hint": None,
+        },
+        {
+            "step_id": 1,
+            "agent_id": "seo_yeon",
+            "role": "assist",
+            "action_hint": "practical_tip",
+            "depends_on": [],
+            "tool_hint": None,
+        },
     ],
     "general": [
-        {"step_id": 0, "agent_id": "ha_eun", "role": "primary", "action_hint": "general_chat", "depends_on": [], "tool_hint": None},
+        {
+            "step_id": 0,
+            "agent_id": "ha_eun",
+            "role": "primary",
+            "action_hint": "general_chat",
+            "depends_on": [],
+            "tool_hint": None,
+        },
     ],
 }
 
@@ -134,7 +197,9 @@ async def plan_tasks(state: JobMateState) -> dict:
 
     try:
         raw = await generate_response(prompt, user_message)
-        cleaned = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        cleaned = (
+            raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        )
         result = json.loads(cleaned)
         steps = result.get("steps", [])
 

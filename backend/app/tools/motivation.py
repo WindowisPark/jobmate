@@ -101,12 +101,14 @@ async def _search_youtube(mood: str) -> list[dict]:
     for item in data.get("items", []):
         vid = item["id"].get("videoId", "")
         snippet = item.get("snippet", {})
-        videos.append({
-            "title": snippet.get("title", ""),
-            "video_id": vid,
-            "url": f"https://www.youtube.com/watch?v={vid}",
-            "channel": snippet.get("channelTitle", ""),
-            "thumbnail": snippet.get("thumbnails", {}).get("medium", {}).get("url", ""),
-        })
+        videos.append(
+            {
+                "title": snippet.get("title", ""),
+                "video_id": vid,
+                "url": f"https://www.youtube.com/watch?v={vid}",
+                "channel": snippet.get("channelTitle", ""),
+                "thumbnail": snippet.get("thumbnails", {}).get("medium", {}).get("url", ""),
+            }
+        )
 
     return videos

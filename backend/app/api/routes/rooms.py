@@ -1,27 +1,22 @@
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.api.middleware.auth import get_current_user_id
 from app.dependencies import get_db
 from app.models.conversation import Conversation
 from app.models.message import Message
-from app.api.middleware.auth import get_optional_user_id
-from app.services.chat_service import ANONYMOUS_USER_ID, ensure_anonymous_user
 
 router = APIRouter()
 
 
-async def _resolve_user_id(request: Request, db: AsyncSession) -> uuid.UUID:
-    """인증된 유저면 user_id, 게스트면 anonymous user_id 반환."""
-    user_id = await get_optional_user_id(request)
-    if user_id:
-        return user_id
-    return await ensure_anonymous_user(db)
+async def _resolve_user_id(request: Request, db: AsyncSession) -> uuid.UUID:  # noqa: ARG001
+    """게스트도 /api/auth/guest 로 진짜 계정을 받으므로 항상 로그인 유저 id (401 if none)."""
+    return await get_current_user_id(request)
 
 
 @router.get("")
@@ -47,14 +42,16 @@ async def list_conversations(
     conversations = []
     for row in result.all():
         conv = row[0]
-        conversations.append({
-            "id": str(conv.id),
-            "title": conv.title,
-            "message_count": row[1],
-            "last_message_at": row[2].isoformat() if row[2] else None,
-            "created_at": conv.created_at.isoformat(),
-            "updated_at": conv.updated_at.isoformat(),
-        })
+        conversations.append(
+            {
+                "id": str(conv.id),
+                "title": conv.title,
+                "message_count": row[1],
+                "last_message_at": row[2].isoformat() if row[2] else None,
+                "created_at": conv.created_at.isoformat(),
+                "updated_at": conv.updated_at.isoformat(),
+            }
+        )
 
     return conversations
 
@@ -131,7 +128,7 @@ async def get_messages(
     conversation_id: uuid.UUID,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    before: Optional[str] = Query(None, description="이 시각 이전 메시지만 반환 (ISO 8601)"),
+    before: str | None = Query(None, description="이 시각 이전 메시지만 반환 (ISO 8601)"),
     limit: int = Query(30, ge=1, le=100),
 ) -> dict:
     """cursor 기반 메시지 페이지네이션. before 파라미터로 이전 메시지를 로드한다."""
@@ -146,10 +143,7 @@ async def get_messages(
     if conv_result.scalar_one_or_none() is None:
         raise HTTPException(status_code=404, detail="대화를 찾을 수 없습니다")
 
-    query = (
-        select(Message)
-        .where(Message.conversation_id == conversation_id)
-    )
+    query = select(Message).where(Message.conversation_id == conversation_id)
 
     if before:
         cursor_dt = datetime.fromisoformat(before)

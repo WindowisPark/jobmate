@@ -32,10 +32,12 @@ def _format_history(history: list[dict]) -> list[dict]:
         else:
             agent_id = entry.get("agent_id", "")
             name = _AGENT_NAMES.get(agent_id, agent_id)
-            formatted.append({
-                "role": "assistant",
-                "content": f"[{name}] {entry['content']}",
-            })
+            formatted.append(
+                {
+                    "role": "assistant",
+                    "content": f"[{name}] {entry['content']}",
+                }
+            )
     return formatted
 
 
@@ -142,17 +144,21 @@ async def generate_response_with_tools(
             logger.error(f"Tool execution failed: {fn_name} — {e}")
             result = {"error": f"도구 실행 중 오류가 발생했습니다: {str(e)}"}
 
-        tool_records.append({
-            "name": fn_name,
-            "args": fn_args,
-            "result": result,
-        })
+        tool_records.append(
+            {
+                "name": fn_name,
+                "args": fn_args,
+                "result": result,
+            }
+        )
 
-        messages.append({
-            "role": "tool",
-            "tool_call_id": tc.id,
-            "content": json.dumps(result, ensure_ascii=False, default=str),
-        })
+        messages.append(
+            {
+                "role": "tool",
+                "tool_call_id": tc.id,
+                "content": json.dumps(result, ensure_ascii=False, default=str),
+            }
+        )
 
     try:
         # 2차 호출: Tool 결과를 반영한 최종 응답

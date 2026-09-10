@@ -1,6 +1,8 @@
 // 내 방 — 개발용 미리보기 페이지(/spike, DEV 전용). M2에서 /village 라우트로 승격되면 삭제.
 
 import { useCallback, useState } from "react";
+import MockInterviewCard from "@/components/chat/MockInterviewCard";
+import ResumeFeedbackCard from "@/components/chat/ResumeFeedbackCard";
 import { MallangRoom } from "@/components/room/MallangRoom";
 import { MALLANG_THEME, PIXEL_THEME, PIXEL_THEME_KENNEY } from "@/components/room/roomLayout";
 import type { OpenTarget, RoomTheme } from "@/components/room/roomLayout";
@@ -10,6 +12,24 @@ const THEMES: Array<{ key: string; label: string; theme: RoomTheme; note: string
   { key: "pixel-kenney", label: "픽셀 · Kenney 슬라임", theme: PIXEL_THEME_KENNEY, note: "Tiny Dungeon 슬라임 색상 회전(비교용)" },
   { key: "mallang", label: "말랑이 일러스트", theme: MALLANG_THEME, note: "saju 말랑이 v2 + CSS 폴백 배경(보관)" },
 ];
+
+const SAMPLE_FEEDBACK = {
+  overall_score: 7,
+  strengths: ["프로젝트마다 맡은 역할이 분명하다", "성과를 수치로 적었다"],
+  improvements: [
+    "첫 문단이 회사 소개로 시작한다. 내 이야기부터 꺼내자",
+    "기술 나열이 길다. 실제로 쓴 것만 남기자",
+  ],
+  rewritten_sections: ["대용량 트래픽을 다뤘습니다 → 일 300만 요청을 처리하는 API 를 맡았습니다"],
+};
+
+const SAMPLE_INTERVIEW = {
+  questions: [
+    { question: "가장 어려웠던 장애 상황과 대응을 말해주세요", category: "경험", tip: "STAR 로 구조화" },
+    { question: "인덱스가 있는데도 느린 쿼리, 어디부터 봅니까", category: "기술", tip: "실행 계획부터" },
+  ],
+  general_tips: ["회사 최근 기술 블로그를 훑고 갈 것", "모르는 건 모른다고 말하고 접근법을 설명할 것"],
+};
 
 export default function SpikePage() {
   const [lit, setLit] = useState(true);
@@ -61,6 +81,13 @@ export default function SpikePage() {
       <MallangRoom theme={current.theme} lit={lit} onOpen={handleOpen} />
 
       <p style={{ fontSize: 11, color: "var(--text-muted)", textAlign: "center" }}>{current.note} · 렌더러: DOM/CSS · 번들 증가 0</p>
+
+      {/* 도구 결과 카드 미리보기 — 첨삭·모의면접 결과를 화면이 버리던 결함을 고치며 추가 */}
+      <div style={{ maxWidth: 560, margin: "0 auto", width: "100%" }} data-testid="tool-cards">
+        <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 6px" }}>도구 결과 카드</p>
+        <ResumeFeedbackCard data={SAMPLE_FEEDBACK} />
+        <MockInterviewCard data={SAMPLE_INTERVIEW} />
+      </div>
 
       {banner && (
         <div style={{

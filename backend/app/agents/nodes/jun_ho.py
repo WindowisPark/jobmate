@@ -1,11 +1,8 @@
+from app.agents.nodes._tool_exec import make_tool_executor
 from app.agents.profiles import AGENT_PROFILES
 from app.agents.state import AgentResponse, JobMateState
 from app.services.llm_service import generate_response_with_tools
-from app.tools import ALL_TOOLS
 from app.tools.schemas import get_tools_for_agent
-
-# DB 세션이 필요한 도구 목록
-_DB_AWARE_TOOLS = {"search_jobs", "save_job_preferences"}
 
 
 async def run(state: JobMateState, is_primary: bool = True) -> AgentResponse:
@@ -43,15 +40,7 @@ async def run(state: JobMateState, is_primary: bool = True) -> AgentResponse:
     tools = get_tools_for_agent(profile["tools"]) if is_primary else []
 
     history = state.get("conversation_history", [])
-    user_id = state.get("user_id", "")
-
-    async def execute_tool(name: str, args: dict) -> dict:
-        fn = ALL_TOOLS.get(name)
-        if fn is None:
-            return {"error": f"알 수 없는 도구: {name}"}
-        if name in _DB_AWARE_TOOLS:
-            args["user_id"] = user_id
-        return await fn(**args)
+    execute_tool = make_tool_executor(state.get("user_id", ""))
 
     content, tool_records = await generate_response_with_tools(
         system, state["user_message"], tools, execute_tool, history=history

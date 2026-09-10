@@ -2,7 +2,9 @@ import type { ChatMessage } from "@/types/chat";
 import { AGENTS } from "@/types/agent";
 import { AgentAvatar } from "@/components/common/AgentAvatar";
 import BreathingExercise from "./BreathingExercise";
+import MockInterviewCard from "./MockInterviewCard";
 import MotivationContent from "./MotivationContent";
+import ResumeFeedbackCard from "./ResumeFeedbackCard";
 import type { ToolResult } from "@/stores/chatStore";
 
 interface Props {
@@ -42,6 +44,10 @@ function renderToolResult(result: ToolResult) {
       return <BreathingExercise key={result.timestamp} data={result.data} />;
     case "get_motivation_content":
       return <MotivationContent key={result.timestamp} data={result.data} />;
+    case "resume_feedback":
+      return <ResumeFeedbackCard key={result.timestamp} data={result.data} />;
+    case "mock_interview":
+      return <MockInterviewCard key={result.timestamp} data={result.data} />;
     default:
       return null;
   }

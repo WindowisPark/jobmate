@@ -5,7 +5,12 @@ TOOL_SCHEMAS: dict[str, dict] = {
         "type": "function",
         "function": {
             "name": "search_jobs",
-            "description": "사람인/공공데이터포털에서 채용공고를 검색합니다. 사용자가 채용공고, 일자리, 취업 정보를 원할 때 사용합니다.",
+            "description": (
+                "사람인 공식 오픈 API 로 채용공고를 검색합니다. "
+                "사용자가 채용공고·일자리·취업 정보를 원할 때 사용합니다. "
+                "응답의 source 가 'manual' 이면 공고를 받지 못한 것이므로, "
+                "공고를 지어내지 말고 search_links 를 그대로 안내하세요."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {

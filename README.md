@@ -10,10 +10,10 @@
 
 | 에이전트 | 역할 | 성격 | 담당 Tool |
 |---------|------|------|----------|
-| **김서연** 📝 | 커리어 코치 | 따뜻하지만 직설적 | 이력서 피드백, 모의 면접 |
-| **박준호** 🔍 | 취업 리서처 | 데이터 중심, 꼼꼼 | 채용공고 검색, 시장 분석 |
-| **이하은** 🌿 | 멘탈 케어 | 공감형, 차분 | 호흡 운동, 루틴 관리 |
-| **정민수** 💡 | 현직자 멘토 | 유머 + 현실 조언 | 동기부여 콘텐츠, 업계 인사이트 |
+| **첨삭이** 📝 | 커리어 코치 | 따뜻하지만 직설적 | 이력서 피드백, 모의 면접 |
+| **탐색이** 🔍 | 취업 리서처 | 데이터 중심, 꼼꼼 | 채용공고 검색, 시장 분석 |
+| **토닥이** 🌿 | 멘탈 케어 | 공감형, 차분 | 호흡 운동, 루틴 관리 |
+| **꿀팁이** 💡 | 현직자 멘토 | 유머 + 현실 조언 | 동기부여 콘텐츠, 업계 인사이트 |
 
 ## Key Features
 
@@ -136,7 +136,7 @@ jobmate/
 │   │   │   └── nodes/       # 4개 에이전트 노드
 │   │   ├── tools/           # 8개 Tool 구현
 │   │   │   ├── schemas.py   # OpenAI Function Calling 스키마
-│   │   │   ├── search_jobs.py    # 공공데이터포털 + 사람인 API
+│   │   │   ├── search_jobs.py    # 사람인 공식 오픈 API (스크래핑 없음)
 │   │   │   ├── motivation.py     # YouTube Data API
 │   │   │   └── ...
 │   │   ├── api/routes/      # FastAPI 라우트
@@ -161,14 +161,14 @@ jobmate/
 
 | Tool | 유형 | 담당 | 설명 |
 |------|------|------|------|
-| `search_jobs` | 외부 API | 박준호 | 공공데이터포털 + 사람인 채용검색 |
-| `get_motivation_content` | 외부 API | 정민수 | YouTube 동기부여 콘텐츠 |
-| `resume_feedback` | LLM | 김서연 | 이력서/자소서 첨삭 (점수+강점+개선점) |
-| `mock_interview` | LLM | 김서연 | 면접 질문 생성 + 답변 팁 |
-| `analyze_market` | LLM | 박준호 | 직군별 채용 트렌드 분석 |
-| `industry_insight` | LLM | 정민수 | 업계 현실 인사이트 |
-| `breathing_exercise` | 내부 | 이하은 | 4-7-8 / 박스 호흡법 가이드 |
-| `schedule_routine` | 내부 | 이하은 | 취준 루틴 등록 + 리마인드 |
+| `search_jobs` | 외부 API | 탐색이 | 사람인 공식 오픈 API 채용검색 (키 없으면 검색 링크 안내) |
+| `get_motivation_content` | 외부 API | 꿀팁이 | YouTube 동기부여 콘텐츠 |
+| `resume_feedback` | LLM | 첨삭이 | 이력서/자소서 첨삭 (점수+강점+개선점) |
+| `mock_interview` | LLM | 첨삭이 | 면접 질문 생성 + 답변 팁 |
+| `analyze_market` | LLM | 탐색이 | 직군별 채용 트렌드 분석 |
+| `industry_insight` | LLM | 꿀팁이 | 업계 현실 인사이트 |
+| `breathing_exercise` | 내부 | 토닥이 | 4-7-8 / 박스 호흡법 가이드 |
+| `schedule_routine` | 내부 | 토닥이 | 취준 루틴 등록 + 리마인드 |
 
 ## License
 

@@ -322,3 +322,45 @@ async def test_multiple_documents_and_win_rate_by_document(client):
     )
     assert [d["title"] for d in r.json()["documents"]] == ["이력서 v4"]
     assert today.year > 2000  # 날짜 고정 없이도 도는 흐름
+
+
+async def test_stats_splits_by_hiring_type(client):
+    """채용방식별로 갈라 봐야 오도하지 않는다.
+
+    자소서가 빠진 수시 전형은 지원 비용이 낮아 건수가 늘고 통과율이 떨어진다.
+    전체 평균만 보면 실력이 나빠진 것처럼 읽힌다.
+    """
+    for company, hiring, status in [
+        ("공채회사A", "open_recruitment", "doc_passed"),
+        ("공채회사B", "open_recruitment", "rejected"),
+        ("수시회사A", "rolling", "rejected"),
+        ("수시회사B", "rolling", "rejected"),
+        ("수시회사C", "rolling", "rejected"),
+    ]:
+        body = {
+            "company_name": company,
+            "position": "백엔드",
+            "status": status,
+            "hiring_type": hiring,
+        }
+        if status == "rejected":
+            body["end_stage"] = "document"
+        r = await client.post("/api/applications", json=body)
+        assert r.status_code == 201, r.text
+
+    stats = (await client.get("/api/applications/stats")).json()
+    by_hiring = {h["hiring_label"]: h for h in stats["by_hiring_type"]}
+
+    assert by_hiring["공채"]["applied"] == 2 and by_hiring["공채"]["passed_docs"] == 1
+    assert by_hiring["수시"]["applied"] == 3 and by_hiring["수시"]["passed_docs"] == 0
+    # 전체로 뭉치면 5건 중 1건이라 수시가 공채를 끌어내린 것처럼 보인다
+    assert stats["funnel"]["applied"] == 5 and stats["funnel"]["passed_docs"] == 1
+
+
+async def test_stats_labels_missing_hiring_type(client):
+    r = await client.post(
+        "/api/applications", json={"company_name": "미지정회사", "position": "백엔드"}
+    )
+    assert r.status_code == 201
+    stats = (await client.get("/api/applications/stats")).json()
+    assert [h["hiring_label"] for h in stats["by_hiring_type"]] == ["미지정"]

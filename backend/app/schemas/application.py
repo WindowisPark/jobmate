@@ -273,11 +273,29 @@ class DocumentStat(BaseModel):
     offer: int
 
 
+class HiringTypeStat(BaseModel):
+    """채용방식별 승률.
+
+    자소서가 빠지면 지원 비용이 낮아져 건수가 늘고 통과율은 떨어진다.
+    실력이 아니라 전략이 바뀐 것이므로 전체 평균만 보면 거꾸로 읽힌다.
+    공채·수시·상시를 갈라야 오도하지 않는다.
+    """
+
+    hiring_type: str | None
+    hiring_label: str
+    total: int
+    applied: int
+    passed_docs: int
+    interview: int
+    offer: int
+
+
 class StatsOut(BaseModel):
     by_status: dict[str, int]
     by_season: list[SeasonStat]
     by_track: list[TrackStat]
     by_document: list[DocumentStat]
+    by_hiring_type: list[HiringTypeStat]
     funnel: dict[str, int]  # applied / passed_docs / interview / offer
     active_count: int
     total: int

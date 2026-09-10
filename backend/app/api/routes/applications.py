@@ -17,6 +17,7 @@ from app.dependencies import get_db
 from app.models.application import (
     ACTIVE_STATUSES,
     DOC_TYPE_LABELS,
+    HIRING_LABELS,
     Application,
     ApplicationStatus,
     Document,
@@ -29,6 +30,7 @@ from app.schemas.application import (
     ApplicationUpdate,
     DocumentInput,
     DocumentStat,
+    HiringTypeStat,
     ImportReport,
     SeasonStat,
     StatsOut,
@@ -51,7 +53,8 @@ SORTABLE = {
 
 
 async def _get_owned(db: AsyncSession, user_id: uuid.UUID, app_id: uuid.UUID) -> Application:
-    # populate_existing: 커밋 후 재조회할 때 identity map 에 남은 stale 관계(track/company)를 다시 채운다
+    # populate_existing: 커밋 후 재조회할 때
+    # identity map 에 남은 stale 관계(track/company)를 다시 채운다
     result = await db.execute(
         select(Application)
         .where(Application.id == app_id, Application.user_id == user_id)
@@ -203,6 +206,7 @@ async def stats(
     seasons: dict[str, dict[str, int]] = {}
     tracks: dict[str, dict] = {}
     docs_stat: dict[str, dict] = {}
+    hiring: dict[str, dict] = {}
     funnel = {"applied": 0, "passed_docs": 0, "interview": 0, "offer": 0}
 
     def bump(bucket: dict[str, int], rank: int, is_offer: bool) -> None:
@@ -253,6 +257,26 @@ async def stats(
         )
         bump(t, rank, is_offer)
 
+        hkey = a.hiring_type or "none"
+        bump(
+            hiring.setdefault(
+                hkey,
+                {
+                    "hiring_type": a.hiring_type,
+                    "hiring_label": HIRING_LABELS.get(a.hiring_type, "미지정")
+                    if a.hiring_type
+                    else "미지정",
+                    "total": 0,
+                    "applied": 0,
+                    "passed_docs": 0,
+                    "interview": 0,
+                    "offer": 0,
+                },
+            ),
+            rank,
+            is_offer,
+        )
+
         # 제출물 버전별 승률 — 자소서가 빠진 전형에서 "무엇을 냈나"를 가르는 축.
         # 한 지원에 여러 제출물이 붙으므로 합계는 지원 수보다 클 수 있다.
         for d in a.documents:
@@ -282,6 +306,9 @@ async def stats(
         by_document=[
             DocumentStat(**v)
             for v in sorted(docs_stat.values(), key=lambda x: (-x["total"], x["title"]))
+        ],
+        by_hiring_type=[
+            HiringTypeStat(**v) for v in sorted(hiring.values(), key=lambda x: -x["total"])
         ],
         funnel=funnel,
         active_count=sum(1 for a in apps if a.status in ACTIVE_STATUSES),
@@ -466,7 +493,9 @@ async def add_document(
 ) -> ApplicationOut:
     """이 지원에 제출물을 하나 붙인다(이력서·포트폴리오·경험기술서 등)."""
     app = await _get_owned(db, user_id, app_id)
-    doc = await _resolve_doc(db, user_id, doc_id=body.id, doc_title=body.title, doc_type=body.doc_type)
+    doc = await _resolve_doc(
+        db, user_id, doc_id=body.id, doc_title=body.title, doc_type=body.doc_type
+    )
     if doc is None:
         raise HTTPException(status_code=422, detail="제출물은 id 나 제목 중 하나가 필요해요")
     svc.attach_document(app, doc)

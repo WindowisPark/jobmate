@@ -7,6 +7,7 @@ import { ApplicationDetailView } from "./ApplicationDetail";
 import { ApplicationForm } from "./ApplicationForm";
 import { ImportCsvDialog } from "./ImportCsvDialog";
 import { StatusChangeSheet } from "./StatusChangeSheet";
+import { InsightView } from "./InsightView";
 import { BoardView, CalendarView, SeasonView, TableView, TrackView } from "./views";
 import { Empty } from "./bits";
 import s from "./Tracker.module.css";
@@ -14,6 +15,7 @@ import s from "./Tracker.module.css";
 const VIEWS: { key: TrackerView; label: string }[] = [
   { key: "board", label: "진행중" }, { key: "calendar", label: "캘린더" },
   { key: "season", label: "시즌별" }, { key: "track", label: "트랙별" }, { key: "table", label: "전체" },
+  { key: "insight", label: "인사이트" },
 ];
 
 export function TrackerBuilding({ mode }: { mode: "list" | "new" | "import" | "detail" }) {
@@ -67,6 +69,7 @@ export function TrackerBuilding({ mode }: { mode: "list" | "new" | "import" | "d
           : view === "calendar" ? <CalendarView items={items} onChangeStatus={setSheetApp} />
           : view === "season" ? <SeasonView items={items} onChangeStatus={setSheetApp} />
           : view === "track" ? <TrackView items={items} onChangeStatus={setSheetApp} />
+          : view === "insight" ? <InsightView />
           : <TableView items={items} onChangeStatus={setSheetApp} />
         )}
       </div>

@@ -109,6 +109,7 @@ export interface Stats {
   by_season: { season: string; total: number; applied: number; passed_docs: number; interview: number; offer: number }[];
   by_track: { track_id: string | null; track_name: string; total: number; applied: number; passed_docs: number; interview: number; offer: number }[];
   by_document: { document_id: string; title: string; doc_type: DocType; doc_type_label: string; total: number; applied: number; passed_docs: number; interview: number; offer: number }[];
+  by_hiring_type: { hiring_type: HiringType | null; hiring_label: string; total: number; applied: number; passed_docs: number; interview: number; offer: number }[];
   funnel: { applied: number; passed_docs: number; interview: number; offer: number };
   active_count: number;
   total: number;

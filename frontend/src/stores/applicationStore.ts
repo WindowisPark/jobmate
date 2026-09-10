@@ -8,7 +8,7 @@ import {
   type Company, type DocumentItem, type EndStage, type ImportReport, type Stats, type Track,
 } from "@/types/application";
 
-export type TrackerView = "board" | "calendar" | "season" | "track" | "table";
+export type TrackerView = "board" | "calendar" | "season" | "track" | "table" | "insight";
 
 interface ApplicationState {
   items: Application[];

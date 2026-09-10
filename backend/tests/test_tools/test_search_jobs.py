@@ -22,7 +22,7 @@ def _job(title="백엔드 개발자", company="테스트컴퍼니", loc="서울 
         "position": {
             "title": title,
             "location": {"name": loc},
-            "experience-level": {"name": career},
+            "experience-level": {"code": 1, "min": 0, "max": 0, "name": career},
             "required-education-level": {"name": "대학교졸업(4년)이상"},
             "job-type": {"name": "정규직"},
         },
@@ -143,3 +143,36 @@ async def test_empty_result_degrades_to_links(api):
     api["payload"] = _api_payload([])
     result = await sj.search_jobs(keywords=["백엔드"])
     assert result["source"] == "manual" and result["jobs"] == []
+
+
+async def test_career_falls_back_to_min_max_when_name_missing(api):
+    """경력은 보통 name 이 오지만 없을 때 min·max 로 만든다."""
+    job = _job()
+    job["position"]["experience-level"] = {"code": 2, "min": 2, "max": 3}
+    api["payload"] = _api_payload([job])
+
+    result = await sj.search_jobs(keywords=["백엔드"])
+
+    assert result["jobs"][0]["career"] == "경력 2~3년"
+
+
+async def test_deadline_falls_back_to_timestamp(api):
+    """expiration-date 는 fields 로 요청해야 온다. 없으면 timestamp 로 만든다."""
+    job = _job()
+    del job["expiration-date"]
+    job["expiration-timestamp"] = "1561820399"
+    api["payload"] = _api_payload([job])
+
+    result = await sj.search_jobs(keywords=["백엔드"])
+
+    assert result["jobs"][0]["deadline"].startswith("2019-06-")
+
+
+async def test_deadline_empty_when_nothing_usable(api):
+    job = _job()
+    del job["expiration-date"]
+    api["payload"] = _api_payload([job])
+
+    result = await sj.search_jobs(keywords=["백엔드"])
+
+    assert result["jobs"][0]["deadline"] == ""

@@ -365,6 +365,36 @@ def _clean(value: str | None) -> str:
     return " ".join(unescape(value).replace(">", " ").split())
 
 
+def _career_text(level: dict) -> str:
+    """경력 표기. 보통 name 이 오지만(예: "경력 2~3년") 없을 때를 대비해 min·max 로 만든다."""
+    name = _clean(level.get("name"))
+    if name:
+        return name
+    lo, hi = level.get("min"), level.get("max")
+    if lo in (None, "") and hi in (None, ""):
+        return ""
+    lo, hi = int(lo or 0), int(hi or 0)
+    if lo == 0 and hi == 0:
+        return "신입"
+    if hi > lo:
+        return f"경력 {lo}~{hi}년"
+    return f"경력 {lo}년 이상"
+
+
+def _deadline(item: dict) -> str:
+    """마감일. expiration-date 는 fields 로 요청해야 오므로 timestamp 로 폴백한다."""
+    value = item.get("expiration-date")
+    if value:
+        return str(value)
+    ts = item.get("expiration-timestamp")
+    if not ts:
+        return ""
+    try:
+        return datetime.fromtimestamp(int(ts)).strftime("%Y-%m-%d")
+    except (ValueError, OSError, OverflowError):
+        return ""
+
+
 def _parse_job(item: dict) -> dict | None:
     position = item.get("position") or {}
     title = _clean(position.get("title"))
@@ -379,11 +409,11 @@ def _parse_job(item: dict) -> dict | None:
         "company": _clean(((item.get("company") or {}).get("detail") or {}).get("name"))
         or "미공개",
         "location": field("location"),
-        "career": field("experience-level"),
+        "career": _career_text(position.get("experience-level") or {}),
         "education": field("required-education-level"),
         "employment_type": field("job-type"),
         "salary": _clean((item.get("salary") or {}).get("name")),
-        "deadline": item.get("expiration-date") or "",
+        "deadline": _deadline(item),
         "url": item.get("url") or "",
         "source": "saramin_api",
     }

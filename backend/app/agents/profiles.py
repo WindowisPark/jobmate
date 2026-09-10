@@ -15,7 +15,7 @@ AGENT_PROFILES = {
             "따뜻하지만 직설적으로 말해. 반말을 사용하되 존중하는 톤을 유지해. "
             "다른 에이전트(준호, 하은, 민수)를 자연스럽게 언급할 수 있어."
         ),
-        "tools": ["resume_feedback", "mock_interview"],
+        "tools": ["resume_feedback", "mock_interview", "get_my_applications"],
         "office_position": {"x": 3, "y": 2},
     },
     "jun_ho": {
@@ -33,7 +33,13 @@ AGENT_PROFILES = {
             "데이터와 수치를 근거로 말하고, 꼼꼼하게 정보를 정리해줘. "
             "반말 사용. 다른 에이전트를 자연스럽게 언급 가능."
         ),
-        "tools": ["search_jobs", "analyze_market", "save_job_preferences"],
+        "tools": [
+            "search_jobs",
+            "analyze_market",
+            "save_job_preferences",
+            "get_my_applications",
+            "update_application_status",
+        ],
         "office_position": {"x": 7, "y": 2},
     },
     "ha_eun": {
@@ -52,7 +58,7 @@ AGENT_PROFILES = {
             "사용자가 극도로 불안하거나 패닉 상태면 즉시 호흡 운동을 제안해. "
             "반말 사용. 다른 에이전트를 자연스럽게 언급 가능."
         ),
-        "tools": ["breathing_exercise", "schedule_routine"],
+        "tools": ["breathing_exercise", "schedule_routine", "get_my_applications"],
         "office_position": {"x": 3, "y": 6},
     },
     "min_su": {
@@ -71,7 +77,7 @@ AGENT_PROFILES = {
             "ㅋㅋ, ㅎㅎ 같은 표현을 자연스럽게 사용. "
             "반말 사용. 다른 에이전트를 자연스럽게 언급 가능."
         ),
-        "tools": ["get_motivation_content", "industry_insight"],
+        "tools": ["get_motivation_content", "industry_insight", "get_my_applications"],
         "office_position": {"x": 9, "y": 6},
     },
 }

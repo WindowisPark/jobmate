@@ -12,6 +12,7 @@ from app.agents.profiles import AGENT_PROFILES
 from app.api.middleware.auth import get_ws_user_id
 from app.dependencies import async_session
 from app.models.conversation import Conversation
+from app.services.application_service import build_application_summary
 from app.services.chat_service import (
     get_or_create_conversation,
     load_conversation_history,
@@ -52,6 +53,8 @@ TOOL_ACTION_MAP = {
     "industry_insight": "analyzing",
     "schedule_routine": "typing",
     "save_job_preferences": "typing",
+    "get_my_applications": "reading",
+    "update_application_status": "typing",
 }
 
 
@@ -136,6 +139,8 @@ async def websocket_chat(websocket: WebSocket, conversation_id: str) -> None:
                     history = await load_conversation_history(db, conv_id)
                     preferences = await load_user_preferences(db, user_id_str)
                     emotion_summary = await get_emotion_summary(db, user_id_str)
+                    # 에이전트가 내 지원 현황을 알고 말하게 한다(월드 신호와 같은 계산)
+                    application_summary = await build_application_summary(db, ws_user_id)
                     await save_user_message(db, conv_id, user_message)
                     await db.commit()
 
@@ -155,6 +160,7 @@ async def websocket_chat(websocket: WebSocket, conversation_id: str) -> None:
                                 "conversation_id": conversation_id,
                                 "user_id": user_id_str,
                                 "user_preferences": preferences,
+                                "application_summary": application_summary,
                                 "emotion_history_summary": emotion_summary,
                                 "task_plan": [],
                                 "step_results": {},

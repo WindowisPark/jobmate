@@ -11,6 +11,7 @@ from app.agents.state import JobMateState
 from app.models.conversation import Conversation
 from app.models.job_preference import JobPreference
 from app.models.message import Message
+from app.services.application_service import build_application_summary
 
 
 def room_uuid(conversation_id: str, user_id: uuid.UUID) -> uuid.UUID:
@@ -203,6 +204,8 @@ async def process_user_message(
 
     # 3. 사용자 프리퍼런스 로드
     preferences = await load_user_preferences(db, user_id)
+    # WS 경로(routes/chat.py)와 같은 계산을 쓴다 — 두 길이 어긋나면 안 된다
+    application_summary = await build_application_summary(db, uuid.UUID(user_id))
 
     # 4. 사용자 메시지 저장
     await save_user_message(db, conv.id, content)
@@ -221,6 +224,7 @@ async def process_user_message(
         "conversation_id": str(conv.id),
         "user_id": user_id,
         "user_preferences": preferences,
+        "application_summary": application_summary,
         "emotion_history_summary": "",
         "task_plan": [],
         "step_results": {},

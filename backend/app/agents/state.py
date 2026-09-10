@@ -35,6 +35,8 @@ class JobMateState(TypedDict):
     user_preferences: dict | None
     # Phase 3: 감정 이력 요약
     emotion_history_summary: str
+    # M3: 지원 현황 요약 — 에이전트가 내 데이터를 알고 말하게 한다
+    application_summary: dict | None
     # Phase 1: Planner 오케스트레이터
     task_plan: list[TaskStep]
     step_results: dict[int, str]

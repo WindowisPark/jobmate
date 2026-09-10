@@ -1,3 +1,8 @@
+from app.models.application import END_STAGE_LABELS, STATUS_LABELS
+
+STATUS_KEYS = list(STATUS_LABELS)
+END_STAGE_KEYS = list(END_STAGE_LABELS)
+
 """OpenAI Function Calling 스키마 정의 — 8개 Tool."""
 
 TOOL_SCHEMAS: dict[str, dict] = {
@@ -176,6 +181,76 @@ TOOL_SCHEMAS: dict[str, dict] = {
                     },
                 },
                 "required": ["job_field"],
+            },
+        },
+    },
+    "get_my_applications": {
+        "type": "function",
+        "function": {
+            "name": "get_my_applications",
+            "description": (
+                "사용자가 기록해 둔 지원 현황을 조회합니다. "
+                "'내 지원 어떻게 돼가', '마감 임박한 거 뭐 있어' 처럼 "
+                "본인의 지원 상황을 물을 때 사용합니다. "
+                "추측하지 말고 이 도구로 확인한 내용만 말하세요."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "enum": STATUS_KEYS,
+                        "description": (
+                            "상태로 좁히기. applied=지원완료, doc_passed=서류통과, "
+                            "interview=면접, offer=최종합격, rejected=탈락"
+                        ),
+                    },
+                    "only_urgent": {
+                        "type": "boolean",
+                        "description": "마감 3일 이내 진행 중인 건만",
+                    },
+                    "query": {"type": "string", "description": "회사명·포지션 검색어"},
+                    "limit": {"type": "integer", "description": "최대 건수 (기본 10)"},
+                },
+                "required": [],
+            },
+        },
+    },
+    "update_application_status": {
+        "type": "function",
+        "function": {
+            "name": "update_application_status",
+            "description": (
+                "지원 상태를 바꿉니다. '카카오 서류 탈락했어', '네이버 면접 잡혔어' 처럼 "
+                "결과나 진행을 알릴 때 사용합니다. "
+                "탈락·포기는 어느 단계에서 끝났는지(end_stage)가 반드시 필요합니다. "
+                "결과에 ambiguous 가 오면 고르지 말고 사용자에게 되물으세요."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "enum": STATUS_KEYS,
+                        "description": "바꿀 상태",
+                    },
+                    "title_query": {
+                        "type": "string",
+                        "description": "어느 지원인지 회사명 등으로 지목 (예: '카카오')",
+                    },
+                    "application_id": {"type": "string", "description": "지원 id 를 아는 경우"},
+                    "end_stage": {
+                        "type": "string",
+                        "enum": END_STAGE_KEYS,
+                        "description": (
+                            "탈락·포기일 때 필수. 어디까지 갔는지. "
+                            "document=서류, coding_test=코테, written_test=필기, "
+                            "assignment=과제, interview=면접, final=최종"
+                        ),
+                    },
+                    "note": {"type": "string", "description": "한 줄 메모"},
+                },
+                "required": ["status"],
             },
         },
     },

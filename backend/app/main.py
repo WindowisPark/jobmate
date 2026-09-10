@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.routes import applications, auth, chat, companies, jobs, rooms, users
+from app.api.routes import applications, auth, chat, companies, jobs, rooms, users, world
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -55,6 +55,7 @@ app.include_router(applications.router, prefix="/api/applications", tags=["appli
 app.include_router(companies.companies, prefix="/api/companies", tags=["companies"])
 app.include_router(companies.tracks, prefix="/api/tracks", tags=["tracks"])
 app.include_router(companies.documents, prefix="/api/documents", tags=["documents"])
+app.include_router(world.router, prefix="/api/world", tags=["world"])
 app.include_router(chat.router, prefix="/ws", tags=["chat"])
 
 

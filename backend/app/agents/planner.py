@@ -5,6 +5,7 @@ import logging
 from typing import Literal, TypedDict
 
 from app.agents.state import JobMateState
+from app.services.application_service import REJECTION_STREAK_MIN
 from app.services.llm_service import generate_response
 
 logger = logging.getLogger(__name__)
@@ -109,10 +110,11 @@ PLANNER_PROMPT = """\
 너는 멀티 에이전트 시스템의 태스크 플래너야. 사용자의 메시지를 분석하여 실행 계획을 JSON으로 반환해.
 
 사용 가능한 에이전트:
-- seo_yeon: 커리어 코치 (이력서 피드백, 면접 준비). 도구: resume_feedback, mock_interview
-- jun_ho: 취업 리서처 (채용공고 검색, 시장 분석, 직무 선호 저장). 도구: search_jobs, analyze_market, save_job_preferences
-- ha_eun: 멘탈 케어 (감정 케어, 호흡 운동, 루틴 관리). 도구: breathing_exercise, schedule_routine
-- min_su: 현직 멘토 (동기부여, 업계 인사이트). 도구: get_motivation_content, industry_insight
+- seo_yeon: 커리어 코치 (이력서 피드백, 면접 준비). 도구: resume_feedback, mock_interview, get_my_applications
+- jun_ho: 취업 리서처 (채용공고 검색, 시장 분석, 내 지원 현황 조회·상태 변경).
+  도구: search_jobs, analyze_market, save_job_preferences, get_my_applications, update_application_status
+- ha_eun: 멘탈 케어 (감정 케어, 호흡 운동, 루틴 관리). 도구: breathing_exercise, schedule_routine, get_my_applications
+- min_su: 현직 멘토 (동기부여, 업계 인사이트). 도구: get_motivation_content, industry_insight, get_my_applications
 
 규칙:
 1. 단순 질문은 1~2 step으로 충분해
@@ -149,25 +151,72 @@ def _is_simple_intent(intent: str, emotion: str, intensity: int) -> bool:
     return intent in FAST_PATH_ROUTING
 
 
+def _prepend_step(
+    steps: list[TaskStep],
+    agent_id: str,
+    action_hint: str,
+    tool_hint: str | None = None,
+) -> list[TaskStep]:
+    """이미 있는 에이전트면 그대로 두고, 없으면 맨 앞에 끼운다.
+
+    step_id 와 depends_on 재정렬은 여기 한 곳에서만 한다.
+    감정 오버라이드와 트래커 오버라이드가 같은 로직을 복사하면 어긋난다.
+    """
+    if any(s["agent_id"] == agent_id for s in steps):
+        return steps
+    head: TaskStep = {
+        "step_id": -1,
+        "agent_id": agent_id,
+        "role": "primary",
+        "action_hint": action_hint,
+        "depends_on": [],
+        "tool_hint": tool_hint,
+    }
+    steps = [head] + steps
+    for i, step in enumerate(steps):
+        step["step_id"] = i
+        step["depends_on"] = [d + 1 for d in step["depends_on"] if d >= 0]
+    return steps
+
+
 def _apply_emotion_override(steps: list[TaskStep], emotion: str, intensity: int) -> list[TaskStep]:
-    """감정 강도가 높으면 ha_eun을 첫 번째로 삽입한다."""
+    """감정 강도가 높으면 ha_eun 을 첫 번째로 삽입한다."""
     if intensity >= 4 and emotion in ("anxious", "depressed", "angry", "frustrated"):
-        has_ha_eun = any(s["agent_id"] == "ha_eun" for s in steps)
-        if not has_ha_eun:
-            ha_eun_step: TaskStep = {
-                "step_id": -1,  # 아래에서 재정렬
-                "agent_id": "ha_eun",
-                "role": "primary",
-                "action_hint": "emotional_support",
+        steps = _prepend_step(steps, "ha_eun", "emotional_support")
+    return steps
+
+
+def _apply_tracker_override(
+    steps: list[TaskStep], summary: dict | None, intent: str
+) -> list[TaskStep]:
+    """지원 현황이 먼저 말해야 할 때 담당자를 앞으로 당긴다.
+
+    감정 오버라이드 다음에 부른다. 이미 ha_eun 이 앞에 있으면 _prepend_step 이 건너뛴다.
+    """
+    if not summary:
+        return steps
+
+    if summary.get("rejection_streak_14d", 0) >= REJECTION_STREAK_MIN:
+        steps = _prepend_step(steps, "ha_eun", "emotional_support")
+
+    if summary.get("urgent_deadlines") and intent in (
+        "general",
+        "job_search",
+        "resume_interview",
+    ):
+        steps = _prepend_step(steps, "jun_ho", "deadline_reminder", "get_my_applications")
+
+    if summary.get("celebration") and not any(s["agent_id"] == "min_su" for s in steps):
+        steps = steps + [
+            {
+                "step_id": len(steps),
+                "agent_id": "min_su",
+                "role": "assist",
+                "action_hint": "celebration",
                 "depends_on": [],
                 "tool_hint": None,
             }
-            steps = [ha_eun_step] + steps
-            # step_id 재정렬
-            for i, step in enumerate(steps):
-                step["step_id"] = i
-                # depends_on도 조정 (기존 것들 +1)
-                step["depends_on"] = [d + 1 for d in step["depends_on"] if d >= 0]
+        ]
     return steps
 
 
@@ -182,6 +231,7 @@ async def plan_tasks(state: JobMateState) -> dict:
     if _is_simple_intent(intent, emotion, intensity):
         steps = [dict(s) for s in FAST_PATH_ROUTING.get(intent, FAST_PATH_ROUTING["general"])]
         steps = _apply_emotion_override(steps, emotion, intensity)
+        steps = _apply_tracker_override(steps, state.get("application_summary"), intent)
         return {
             "task_plan": steps,
             "step_results": {},
@@ -211,6 +261,7 @@ async def plan_tasks(state: JobMateState) -> dict:
             raise ValueError("Empty plan")
 
         steps = _apply_emotion_override(steps, emotion, intensity)
+        steps = _apply_tracker_override(steps, state.get("application_summary"), intent)
 
         return {
             "task_plan": steps,
@@ -222,6 +273,7 @@ async def plan_tasks(state: JobMateState) -> dict:
         logger.warning(f"Planner LLM failed, falling back to fast-path: {e}")
         steps = [dict(s) for s in FAST_PATH_ROUTING.get(intent, FAST_PATH_ROUTING["general"])]
         steps = _apply_emotion_override(steps, emotion, intensity)
+        steps = _apply_tracker_override(steps, state.get("application_summary"), intent)
         return {
             "task_plan": steps,
             "step_results": {},

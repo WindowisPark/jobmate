@@ -13,7 +13,9 @@ from app.dependencies import async_session
 from app.tools import ALL_TOOLS
 
 # DB 세션과 user_id 를 서버가 채워주는 도구. LLM 이 정할 값이 아니다.
-DB_AWARE_TOOLS: frozenset[str] = frozenset({"search_jobs", "save_job_preferences"})
+DB_AWARE_TOOLS: frozenset[str] = frozenset(
+    {"search_jobs", "save_job_preferences", "get_my_applications", "update_application_status"}
+)
 
 # 서버가 채우는 인자 — 모델이 넣어 보내도 무시한다(중복 인자 TypeError 방지)
 _SERVER_ARGS = ("db", "user_id")

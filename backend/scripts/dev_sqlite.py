@@ -41,14 +41,15 @@ class FakeRedis:
 dependencies.redis_client = FakeRedis()  # type: ignore[assignment]
 
 from app.models.application import (  # noqa: E402
-    Application, ApplicationStatusHistory, Company, Document, Track,
+    Application, ApplicationDocument, ApplicationStatusHistory, Company, Document, Track,
 )
 from app.models.conversation import Conversation  # noqa: E402
 from app.models.user import Base, User  # noqa: E402
 
 TABLES = [
     User.__table__, Company.__table__, Track.__table__, Document.__table__,
-    Application.__table__, ApplicationStatusHistory.__table__, Conversation.__table__,
+    Application.__table__, ApplicationDocument.__table__,
+    ApplicationStatusHistory.__table__, Conversation.__table__,
 ]
 
 

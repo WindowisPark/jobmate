@@ -42,8 +42,16 @@ export interface Company extends CompanyRef {
   industry: string | null; size: string | null; website: string | null; memo: string | null; application_count: number;
 }
 export interface Track { id: string; name: string; color: string | null; sort_order: number }
-export interface DocumentRef { id: string; title: string }
-export interface DocumentItem extends DocumentRef { doc_type: string; created_at: string; updated_at: string }
+export type DocType = "resume" | "cover_letter" | "portfolio" | "experience" | "other";
+/** 자소서를 빼고 이력서·포트폴리오·경험기술서를 함께 받는 전형이 늘어 종류를 넓혔다 */
+export const DOC_TYPE_LABELS: Record<DocType, string> = {
+  resume: "이력서", cover_letter: "자기소개서", portfolio: "포트폴리오",
+  experience: "경험기술서", other: "기타",
+};
+export interface DocumentRef { id: string; title: string; doc_type: DocType; doc_type_label?: string | null }
+export interface DocumentItem extends DocumentRef { created_at: string; updated_at: string }
+/** 지원에 붙일 제출물 — id 나 title 중 하나 */
+export interface DocumentInput { id?: string; title?: string; doc_type?: DocType }
 
 export interface Application {
   id: string;
@@ -74,7 +82,8 @@ export interface Application {
   reached_interview: boolean;
   company: CompanyRef;
   track: Track | null;
-  resume_document: DocumentRef | null;
+  documents: DocumentRef[];
+  resume_document: DocumentRef | null;   // documents 중 이력서 종류의 첫 번째(파생)
 }
 
 export interface HistoryEntry {
@@ -87,6 +96,7 @@ export interface ApplicationInput {
   company_id?: string; company_name?: string;
   track_id?: string; track_name?: string; clear_track?: boolean;
   resume_document_id?: string; resume_document_title?: string; clear_resume_document?: boolean;
+  documents?: DocumentInput[]; clear_documents?: boolean;   // documents 를 주면 제출물 집합 전체를 대체
   position?: string; title?: string; posting_url?: string | null;
   status?: ApplicationStatus; end_stage?: EndStage | null;
   employment_type?: EmploymentType | null; hiring_type?: HiringType | null;
@@ -98,6 +108,7 @@ export interface Stats {
   by_status: Partial<Record<ApplicationStatus, number>>;
   by_season: { season: string; total: number; applied: number; passed_docs: number; interview: number; offer: number }[];
   by_track: { track_id: string | null; track_name: string; total: number; applied: number; passed_docs: number; interview: number; offer: number }[];
+  by_document: { document_id: string; title: string; doc_type: DocType; doc_type_label: string; total: number; applied: number; passed_docs: number; interview: number; offer: number }[];
   funnel: { applied: number; passed_docs: number; interview: number; offer: number };
   active_count: number;
   total: number;

@@ -14,13 +14,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.middleware.auth import get_current_user_id
 from app.dependencies import get_db
-from app.models.application import ACTIVE_STATUSES, Application, ApplicationStatus
+from app.models.application import (
+    ACTIVE_STATUSES,
+    DOC_TYPE_LABELS,
+    Application,
+    ApplicationStatus,
+    Document,
+)
 from app.schemas.application import (
     ApplicationCreate,
     ApplicationDetailOut,
     ApplicationListOut,
     ApplicationOut,
     ApplicationUpdate,
+    DocumentInput,
+    DocumentStat,
     ImportReport,
     SeasonStat,
     StatsOut,
@@ -63,11 +71,9 @@ async def _resolve_refs(
     company_name: str | None,
     track_id: uuid.UUID | None,
     track_name: str | None,
-    doc_id: uuid.UUID | None,
-    doc_title: str | None,
-) -> tuple[uuid.UUID | None, uuid.UUID | None, uuid.UUID | None]:
+) -> tuple[uuid.UUID | None, uuid.UUID | None]:
     """id 가 오면 소유권 확인, 이름이 오면 get-or-create."""
-    cid = tid = did = None
+    cid = tid = None
     if company_id:
         cid = (await svc_owned(db, user_id, "companies", company_id)).id
     elif company_name:
@@ -76,11 +82,36 @@ async def _resolve_refs(
         tid = (await svc_owned(db, user_id, "tracks", track_id)).id
     elif track_name:
         tid = (await svc.get_or_create_track(db, user_id, track_name)).id
+    return cid, tid
+
+
+async def _resolve_doc(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    *,
+    doc_id: uuid.UUID | None,
+    doc_title: str | None,
+    doc_type: str = "resume",
+) -> Document | None:
     if doc_id:
-        did = (await svc_owned(db, user_id, "documents", doc_id)).id
-    elif doc_title:
-        did = (await svc.get_or_create_document(db, user_id, doc_title)).id
-    return cid, tid, did
+        return await svc_owned(db, user_id, "documents", doc_id)
+    if doc_title and doc_title.strip():
+        return await svc.get_or_create_document(db, user_id, doc_title, doc_type)
+    return None
+
+
+async def _resolve_docs(
+    db: AsyncSession, user_id: uuid.UUID, items: list[DocumentInput] | None
+) -> list[Document]:
+    """제출물 목록을 해석한다(중복 제거, 입력 순서 유지)."""
+    out: list[Document] = []
+    for it in items or []:
+        doc = await _resolve_doc(
+            db, user_id, doc_id=it.id, doc_title=it.title, doc_type=it.doc_type
+        )
+        if doc and all(d.id != doc.id for d in out):
+            out.append(doc)
+    return out
 
 
 async def svc_owned(db: AsyncSession, user_id: uuid.UUID, table: str, obj_id: uuid.UUID):
@@ -171,6 +202,7 @@ async def stats(
     by_status: dict[str, int] = {}
     seasons: dict[str, dict[str, int]] = {}
     tracks: dict[str, dict] = {}
+    docs_stat: dict[str, dict] = {}
     funnel = {"applied": 0, "passed_docs": 0, "interview": 0, "offer": 0}
 
     def bump(bucket: dict[str, int], rank: int, is_offer: bool) -> None:
@@ -221,12 +253,35 @@ async def stats(
         )
         bump(t, rank, is_offer)
 
+        # 제출물 버전별 승률 — 자소서가 빠진 전형에서 "무엇을 냈나"를 가르는 축.
+        # 한 지원에 여러 제출물이 붙으므로 합계는 지원 수보다 클 수 있다.
+        for d in a.documents:
+            entry = docs_stat.setdefault(
+                str(d.id),
+                {
+                    "document_id": d.id,
+                    "title": d.title,
+                    "doc_type": d.doc_type,
+                    "doc_type_label": DOC_TYPE_LABELS.get(d.doc_type, d.doc_type),
+                    "total": 0,
+                    "applied": 0,
+                    "passed_docs": 0,
+                    "interview": 0,
+                    "offer": 0,
+                },
+            )
+            bump(entry, rank, is_offer)
+
     return StatsOut(
         by_status=by_status,
         by_season=[SeasonStat(season=k, **v) for k, v in sorted(seasons.items(), reverse=True)],
         by_track=[
             TrackStat(**v)
             for v in sorted(tracks.values(), key=lambda x: (-x["total"], x["track_name"]))
+        ],
+        by_document=[
+            DocumentStat(**v)
+            for v in sorted(docs_stat.values(), key=lambda x: (-x["total"], x["title"]))
         ],
         funnel=funnel,
         active_count=sum(1 for a in apps if a.status in ACTIVE_STATUSES),
@@ -241,16 +296,20 @@ async def create_application(
     user_id: uuid.UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> ApplicationOut:
-    cid, tid, did = await _resolve_refs(
+    cid, tid = await _resolve_refs(
         db,
         user_id,
         company_id=body.company_id,
         company_name=body.company_name,
         track_id=body.track_id,
         track_name=body.track_name,
-        doc_id=body.resume_document_id,
-        doc_title=body.resume_document_title,
     )
+    docs = await _resolve_docs(db, user_id, body.documents)
+    resume = await _resolve_doc(
+        db, user_id, doc_id=body.resume_document_id, doc_title=body.resume_document_title
+    )
+    if resume and all(d.id != resume.id for d in docs):
+        docs.append(resume)
     assert cid is not None
     company = await svc_owned(db, user_id, "companies", cid)
     try:
@@ -265,7 +324,6 @@ async def create_application(
         user_id=user_id,
         company_id=cid,
         track_id=tid,
-        resume_document_id=did,
         title=(body.title or svc.default_title(company.name, body.position)).strip(),
         position=body.position.strip(),
         posting_url=body.posting_url,
@@ -279,6 +337,7 @@ async def create_application(
         next_event_at=body.next_event_at,
         next_action=body.next_action,
         retrospective=body.retrospective,
+        documents=docs,
     )
     db.add(app)
     try:
@@ -311,15 +370,13 @@ async def update_application(
     db: AsyncSession = Depends(get_db),
 ) -> ApplicationOut:
     app = await _get_owned(db, user_id, app_id)
-    cid, tid, did = await _resolve_refs(
+    cid, tid = await _resolve_refs(
         db,
         user_id,
         company_id=body.company_id,
         company_name=body.company_name,
         track_id=body.track_id,
         track_name=body.track_name,
-        doc_id=body.resume_document_id,
-        doc_title=body.resume_document_title,
     )
     if cid:
         app.company_id = cid
@@ -327,10 +384,19 @@ async def update_application(
         app.track_id = tid
     elif body.clear_track:
         app.track_id = None
-    if did:
-        app.resume_document_id = did
+
+    # 제출물: documents 는 집합 전체를 대체하고, resume_* 는 이력서 슬롯만 건드린다
+    if body.documents is not None:
+        svc.set_documents(app, await _resolve_docs(db, user_id, body.documents))
+    elif body.clear_documents:
+        svc.set_documents(app, [])
+    resume = await _resolve_doc(
+        db, user_id, doc_id=body.resume_document_id, doc_title=body.resume_document_title
+    )
+    if resume:
+        svc.replace_resume(app, resume)
     elif body.clear_resume_document:
-        app.resume_document_id = None
+        svc.replace_resume(app, None)
 
     for name in (
         "position",
@@ -388,6 +454,39 @@ async def delete_application(
     app = await _get_owned(db, user_id, app_id)
     await db.delete(app)
     await db.commit()
+
+
+# ---------------------------------------------------------------- 제출물 연결
+@router.post("/{app_id}/documents", response_model=ApplicationOut, status_code=201)
+async def add_document(
+    app_id: uuid.UUID,
+    body: DocumentInput,
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+) -> ApplicationOut:
+    """이 지원에 제출물을 하나 붙인다(이력서·포트폴리오·경험기술서 등)."""
+    app = await _get_owned(db, user_id, app_id)
+    doc = await _resolve_doc(db, user_id, doc_id=body.id, doc_title=body.title, doc_type=body.doc_type)
+    if doc is None:
+        raise HTTPException(status_code=422, detail="제출물은 id 나 제목 중 하나가 필요해요")
+    svc.attach_document(app, doc)
+    await db.commit()
+    return ApplicationOut(**svc.to_out(await _get_owned(db, user_id, app_id)))
+
+
+@router.delete("/{app_id}/documents/{doc_id}", response_model=ApplicationOut)
+async def remove_document(
+    app_id: uuid.UUID,
+    doc_id: uuid.UUID,
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+) -> ApplicationOut:
+    """연결만 끊는다. 문서 자체는 남는다(다른 지원이 쓰고 있을 수 있다)."""
+    app = await _get_owned(db, user_id, app_id)
+    if not svc.detach_document(app, doc_id):
+        raise HTTPException(status_code=404, detail="이 지원에 붙어 있지 않은 제출물이에요")
+    await db.commit()
+    return ApplicationOut(**svc.to_out(await _get_owned(db, user_id, app_id)))
 
 
 # ---------------------------------------------------------------- 노션 CSV 임포트

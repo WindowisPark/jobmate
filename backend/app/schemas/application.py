@@ -75,9 +75,12 @@ class TrackOut(BaseModel):
     sort_order: int = 0
 
 
+DOC_TYPE_PATTERN = r"^(resume|cover_letter|portfolio|experience|other)$"
+
+
 class DocumentCreate(BaseModel):
     title: str = Field(min_length=1, max_length=200)
-    doc_type: str = Field(default="resume", pattern=r"^(resume|cover_letter|portfolio)$")
+    doc_type: str = Field(default="resume", pattern=DOC_TYPE_PATTERN)
     content: str | None = None
 
 
@@ -94,6 +97,22 @@ class DocumentRef(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     title: str
+    doc_type: str = "resume"
+    doc_type_label: str | None = None
+
+
+class DocumentInput(BaseModel):
+    """지원에 붙일 제출물 하나. id 가 오면 소유권 확인, title 이 오면 get-or-create."""
+
+    id: UUID | None = None
+    title: str | None = Field(default=None, max_length=200)
+    doc_type: str = Field(default="resume", pattern=DOC_TYPE_PATTERN)
+
+    @model_validator(mode="after")
+    def _need_one(self) -> "DocumentInput":
+        if not self.id and not (self.title and self.title.strip()):
+            raise ValueError("제출물은 id 나 제목 중 하나가 필요해요")
+        return self
 
 
 # ---------------------------------------------------------------- 지원
@@ -106,6 +125,8 @@ class ApplicationCreate(BaseModel):
     track_name: str | None = Field(default=None, max_length=100)
     resume_document_id: UUID | None = None
     resume_document_title: str | None = Field(default=None, max_length=200)
+    # 이력서 외 제출물(포트폴리오·경험기술서 등). 주면 제출물 집합 전체를 이걸로 맞춘다.
+    documents: list[DocumentInput] | None = None
 
     position: str = Field(min_length=1, max_length=200)
     title: str | None = Field(default=None, max_length=300)  # 비면 "{회사} - {포지션}"
@@ -139,6 +160,8 @@ class ApplicationUpdate(BaseModel):
     resume_document_id: UUID | None = None
     resume_document_title: str | None = Field(default=None, max_length=200)
     clear_resume_document: bool = False
+    documents: list[DocumentInput] | None = None  # 주면 제출물 집합 전체를 대체
+    clear_documents: bool = False
 
     position: str | None = Field(default=None, min_length=1, max_length=200)
     title: str | None = Field(default=None, max_length=300)
@@ -199,7 +222,8 @@ class ApplicationOut(BaseModel):
     reached_interview: bool
     company: CompanyRef
     track: TrackOut | None
-    resume_document: DocumentRef | None
+    documents: list[DocumentRef]
+    resume_document: DocumentRef | None  # documents 중 이력서 종류의 첫 번째(파생)
 
 
 class ApplicationDetailOut(ApplicationOut):
@@ -235,10 +259,25 @@ class TrackStat(BaseModel):
     offer: int
 
 
+class DocumentStat(BaseModel):
+    """제출물 버전별 승률 — 자소서가 빠진 전형에서 '무엇을 냈나'를 가르는 축."""
+
+    document_id: UUID
+    title: str
+    doc_type: str
+    doc_type_label: str
+    total: int
+    applied: int
+    passed_docs: int
+    interview: int
+    offer: int
+
+
 class StatsOut(BaseModel):
     by_status: dict[str, int]
     by_season: list[SeasonStat]
     by_track: list[TrackStat]
+    by_document: list[DocumentStat]
     funnel: dict[str, int]  # applied / passed_docs / interview / offer
     active_count: int
     total: int

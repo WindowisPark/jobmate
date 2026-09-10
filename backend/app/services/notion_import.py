@@ -29,7 +29,7 @@ from app.models.application import (
     Document,
     Track,
 )
-from app.services.application_service import default_title
+from app.services.application_service import default_title, replace_resume
 
 HEADER_MAP: dict[str, str] = {
     "제목": "title",
@@ -326,7 +326,7 @@ async def import_notion_csv(
                 user_id=user_id,
                 company_id=company.id,
                 track_id=track.id if track else None,
-                resume_document_id=doc.id if doc else None,
+                documents=[doc] if doc else [],
                 title=row.title,
                 position=row.position,
                 posting_url=row.posting_url,
@@ -379,7 +379,8 @@ async def import_notion_csv(
         if track:
             app.track_id = track.id
         if doc:
-            app.resume_document_id = doc.id
+            # 노션 '이력서 버전' 은 이력서 슬롯만 갈아끼운다
+            replace_resume(app, doc)
         if row.status != prev_status:
             app.status = row.status
             app.end_stage = row.end_stage

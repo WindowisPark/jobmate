@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.application import (
     ACTIVE_STATUSES,
     CLOSED_WITH_STAGE,
+    DOC_TYPE_LABELS,
     EMPLOYMENT_LABELS,
     END_STAGE_LABELS,
     HIRING_LABELS,
@@ -117,6 +118,24 @@ def default_title(company_name: str, position: str) -> str:
     return f"{company_name.strip()} - {position.strip()}"
 
 
+# ---------------------------------------------------------------- 제출물
+def doc_ref(doc: Document) -> dict:
+    return {
+        "id": doc.id,
+        "title": doc.title,
+        "doc_type": doc.doc_type,
+        "doc_type_label": DOC_TYPE_LABELS.get(doc.doc_type, doc.doc_type),
+    }
+
+
+def primary_resume(app: Application) -> Document | None:
+    """'이 지원의 이력서' — 붙은 제출물 중 이력서 종류의 첫 번째.
+
+    단일 FK 를 조인 테이블로 바꾸면서 생긴 파생 값. 기존 API 응답 모양을 유지한다.
+    """
+    return next((d for d in app.documents if d.doc_type == "resume"), None)
+
+
 # ---------------------------------------------------------------- 직렬화
 def to_out(app: Application, today: date | None = None) -> dict:
     today = today or today_kst()
@@ -161,11 +180,8 @@ def to_out(app: Application, today: date | None = None) -> dict:
             if app.track
             else None
         ),
-        "resume_document": (
-            {"id": app.resume_document.id, "title": app.resume_document.title}
-            if app.resume_document
-            else None
-        ),
+        "documents": [doc_ref(d) for d in app.documents],
+        "resume_document": (doc_ref(resume) if (resume := primary_resume(app)) else None),
     }
 
 
@@ -200,7 +216,9 @@ async def get_or_create_track(db: AsyncSession, user_id: uuid.UUID, name: str) -
     return track
 
 
-async def get_or_create_document(db: AsyncSession, user_id: uuid.UUID, title: str) -> Document:
+async def get_or_create_document(
+    db: AsyncSession, user_id: uuid.UUID, title: str, doc_type: str = "resume"
+) -> Document:
     title = title.strip()
     result = await db.execute(
         select(Document).where(
@@ -209,10 +227,42 @@ async def get_or_create_document(db: AsyncSession, user_id: uuid.UUID, title: st
     )
     doc = result.scalar_one_or_none()
     if doc is None:
-        doc = Document(user_id=user_id, title=title, doc_type="resume")
+        doc = Document(user_id=user_id, title=title, doc_type=doc_type)
         db.add(doc)
         await db.flush()
     return doc
+
+
+def attach_document(app: Application, doc: Document) -> bool:
+    """제출물을 지원에 붙인다. 이미 붙어 있으면 False.
+
+    연결 행(application_documents)은 secondary 관계가 관리하므로 컬렉션만 건드린다.
+    직접 INSERT 하면 같은 행을 두 번 넣어 UNIQUE 제약에 걸린다.
+    """
+    if any(d.id == doc.id for d in app.documents):
+        return False
+    app.documents.append(doc)
+    return True
+
+
+def detach_document(app: Application, doc_id: uuid.UUID) -> bool:
+    """연결만 끊는다. 문서 자체는 남긴다(다른 지원이 쓰고 있을 수 있다)."""
+    before = len(app.documents)
+    app.documents[:] = [d for d in app.documents if d.id != doc_id]
+    return len(app.documents) != before
+
+
+def set_documents(app: Application, docs: list[Document]) -> None:
+    """제출물 집합 전체를 교체한다."""
+    app.documents[:] = list(docs)
+
+
+def replace_resume(app: Application, doc: Document | None) -> None:
+    """'이력서 버전' 슬롯 하나만 갈아끼운다. 포트폴리오·경험기술서 연결은 건드리지 않는다."""
+    keep_id = doc.id if doc else None
+    app.documents[:] = [d for d in app.documents if d.doc_type != "resume" or d.id == keep_id]
+    if doc and not any(d.id == doc.id for d in app.documents):
+        app.documents.append(doc)
 
 
 # ---------------------------------------------------------------- 상태 전환
@@ -295,7 +345,8 @@ async def build_application_summary(
             "d_day": d_day(a.deadline_at, today),
             "next_event_at": a.next_event_at.isoformat() if a.next_event_at else None,
             "next_action": a.next_action,
-            "resume_document": a.resume_document.title if a.resume_document else None,
+            "resume_document": (r.title if (r := primary_resume(a)) else None),
+            "documents": [d.title for d in a.documents],
         }
 
     urgent = sorted(

@@ -119,7 +119,15 @@ HIRING_LABELS: dict[str, str] = {
     "always_open": "상시",
 }
 
-DOC_TYPES: tuple[str, ...] = ("resume", "cover_letter", "portfolio")
+# 제출물 종류. 자소서를 빼고 직무 경험 기술서·포트폴리오로 받는 전형이 늘어 'experience' 를 둔다.
+DOC_TYPES: tuple[str, ...] = ("resume", "cover_letter", "portfolio", "experience", "other")
+DOC_TYPE_LABELS: dict[str, str] = {
+    "resume": "이력서",
+    "cover_letter": "자기소개서",
+    "portfolio": "포트폴리오",
+    "experience": "경험기술서",
+    "other": "기타",
+}
 HISTORY_SOURCES: tuple[str, ...] = ("user", "agent", "import")
 
 
@@ -225,9 +233,6 @@ class Application(Base):
         ForeignKey("companies.id", ondelete="RESTRICT"), nullable=False
     )
     track_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("tracks.id", ondelete="SET NULL"))
-    resume_document_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("documents.id", ondelete="SET NULL")
-    )
 
     title: Mapped[str] = mapped_column(String(300), nullable=False)  # "회사 - 포지션"
     position: Mapped[str] = mapped_column(String(200), nullable=False)  # 공고에 적힌 직무명 그대로
@@ -251,13 +256,42 @@ class Application(Base):
 
     company: Mapped["Company"] = relationship(back_populates="applications", lazy="selectin")
     track: Mapped["Track | None"] = relationship(lazy="selectin")
-    resume_document: Mapped["Document | None"] = relationship(lazy="selectin")
+    # 제출물은 여러 개다 — 이력서 하나로 묶으면 "포폴 v2 붙인 지원의 서류 통과율" 을 물을 수 없다
+    documents: Mapped[list["Document"]] = relationship(
+        secondary="application_documents",
+        lazy="selectin",
+        order_by="Document.created_at",
+    )
     history: Mapped[list["ApplicationStatusHistory"]] = relationship(
         back_populates="application",
         cascade="all, delete-orphan",
         passive_deletes=True,
         order_by="ApplicationStatusHistory.changed_at",
     )
+
+
+class ApplicationDocument(Base):
+    """지원 ↔ 제출물 연결.
+
+    자소서를 빼고 이력서·포트폴리오·경험기술서를 함께 받는 전형이 늘면서
+    '지원 1건 = 이력서 1개' 가정이 깨졌다. 승률을 문서 버전별로 가르려면
+    무엇을 함께 냈는지가 행으로 남아야 한다.
+    """
+
+    __tablename__ = "application_documents"
+    __table_args__ = (
+        UniqueConstraint("application_id", "document_id", name="uq_app_documents_app_doc"),
+        Index("ix_app_documents_document", "document_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    application_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("applications.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("documents.id", ondelete="CASCADE"), nullable=False
+    )
+    attached_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
 
 
 class ApplicationStatusHistory(Base):

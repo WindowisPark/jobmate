@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApplicationStore } from "@/stores/applicationStore";
-import { STATUS_LABELS, type Application, type ApplicationDetail as Detail, type HistoryEntry } from "@/types/application";
+import { DOC_TYPE_LABELS, STATUS_LABELS, type Application, type ApplicationDetail as Detail, type HistoryEntry } from "@/types/application";
 import { ApplicationForm } from "./ApplicationForm";
 import { StatusChangeSheet } from "./StatusChangeSheet";
 import { DDayChip, StatusBadge, TrackChip, formatDate } from "./bits";
@@ -60,7 +60,10 @@ export function ApplicationDetailView({ id }: { id: string }) {
           <dt className={s.subLabel}>지원일</dt><dd>{cur.applied_at ?? "—"}</dd>
           <dt className={s.subLabel}>발견일</dt><dd>{cur.discovered_at ?? "—"}</dd>
           {(cur.employment_label || cur.hiring_label) && <><dt className={s.subLabel}>형태</dt><dd>{[cur.employment_label, cur.hiring_label].filter(Boolean).join(" · ")}</dd></>}
-          {cur.resume_document && <><dt className={s.subLabel}>이력서</dt><dd>{cur.resume_document.title}</dd></>}
+          {cur.documents.length > 0 && (
+            <><dt className={s.subLabel}>제출물</dt>
+              <dd>{cur.documents.map((d) => `${d.title} (${d.doc_type_label ?? DOC_TYPE_LABELS[d.doc_type]})`).join(" · ")}</dd></>
+          )}
           {cur.season && <><dt className={s.subLabel}>시즌</dt><dd>{cur.season}</dd></>}
           {cur.retrospective && <><dt className={s.subLabel}>회고</dt><dd style={{ whiteSpace: "pre-wrap" }}>{cur.retrospective}</dd></>}
         </dl>

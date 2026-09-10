@@ -126,3 +126,8 @@
   .row { grid-template-columns: 1fr; }
   .report { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* 추가 제출물 한 줄 — 제목 · 종류 · 빼기 */
+.docRow { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+.docRow input { flex: 1; min-width: 0; }
+.docRow select { flex: 0 0 auto; width: auto; }

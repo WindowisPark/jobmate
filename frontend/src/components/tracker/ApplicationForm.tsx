@@ -2,8 +2,9 @@
 import { useState } from "react";
 import { useApplicationStore } from "@/stores/applicationStore";
 import {
-  CLOSED_WITH_STAGE, EMPLOYMENT_LABELS, END_STAGE_LABELS, HIRING_LABELS, STATUS_LABELS,
-  type Application, type ApplicationInput, type ApplicationStatus, type EmploymentType, type EndStage, type HiringType,
+  CLOSED_WITH_STAGE, DOC_TYPE_LABELS, EMPLOYMENT_LABELS, END_STAGE_LABELS, HIRING_LABELS, STATUS_LABELS,
+  type Application, type ApplicationInput, type ApplicationStatus, type DocType, type DocumentInput,
+  type EmploymentType, type EndStage, type HiringType,
 } from "@/types/application";
 import s from "./Tracker.module.css";
 
@@ -35,6 +36,10 @@ export function ApplicationForm({ initial, onSaved, onCancel }: Props) {
     next_action: initial?.next_action ?? "",
     retrospective: initial?.retrospective ?? "",
   });
+  // 이력서 외 제출물(포트폴리오·경험기술서 등) — 자소서를 빼는 전형이 늘어 여러 개를 붙인다
+  const [extra, setExtra] = useState<{ title: string; doc_type: DocType }[]>(
+    (initial?.documents ?? []).filter((d) => d.doc_type !== "resume").map((d) => ({ title: d.title, doc_type: d.doc_type })),
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
@@ -66,8 +71,11 @@ export function ApplicationForm({ initial, onSaved, onCancel }: Props) {
       };
       if (f.track_name.trim()) base.track_name = f.track_name.trim();
       else if (initial?.track) base.clear_track = true;
-      if (f.resume_document_title.trim()) base.resume_document_title = f.resume_document_title.trim();
-      else if (initial?.resume_document) base.clear_resume_document = true;
+      // 제출물은 집합 전체를 보낸다 — 이력서 한 칸으로는 요즘 전형을 담지 못한다
+      const docs: DocumentInput[] = [];
+      if (f.resume_document_title.trim()) docs.push({ title: f.resume_document_title.trim(), doc_type: "resume" });
+      for (const d of extra) if (d.title.trim()) docs.push({ title: d.title.trim(), doc_type: d.doc_type });
+      base.documents = docs;
 
       const saved = initial
         ? await update(initial.id, base)
@@ -108,6 +116,31 @@ export function ApplicationForm({ initial, onSaved, onCancel }: Props) {
           <input list="tracker-docs" value={f.resume_document_title} onChange={set("resume_document_title")} placeholder="이력서 v3" />
           <datalist id="tracker-docs">{documents.map((d) => <option key={d.id} value={d.title} />)}</datalist>
         </div>
+      </div>
+      <div className={s.field}>
+        <label>추가 제출물 <span className={s.subLabel}>(포트폴리오·경험기술서 등 — 자소서 없는 전형)</span></label>
+        {extra.map((d, i) => (
+          <div key={i} className={s.docRow}>
+            <input
+              list="tracker-docs"
+              value={d.title}
+              placeholder="포트폴리오 v2"
+              onChange={(e) => setExtra((p) => p.map((x, j) => (j === i ? { ...x, title: e.target.value } : x)))}
+            />
+            <select
+              value={d.doc_type}
+              onChange={(e) => setExtra((p) => p.map((x, j) => (j === i ? { ...x, doc_type: e.target.value as DocType } : x)))}
+            >
+              {(Object.keys(DOC_TYPE_LABELS) as DocType[]).filter((k) => k !== "resume").map((k) => (
+                <option key={k} value={k}>{DOC_TYPE_LABELS[k]}</option>
+              ))}
+            </select>
+            <button type="button" className={s.iconBtn} aria-label="제출물 빼기" onClick={() => setExtra((p) => p.filter((_, j) => j !== i))}>✕</button>
+          </div>
+        ))}
+        <button type="button" className={s.iconBtn} onClick={() => setExtra((p) => [...p, { title: "", doc_type: "portfolio" }])}>
+          + 제출물 추가
+        </button>
       </div>
       <div className={s.field}>
         <label>공고 URL</label>

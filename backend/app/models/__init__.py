@@ -4,7 +4,14 @@ from app.models.message import Message
 from app.models.agent_state import Agent, UserEmotionLog
 from app.models.job_preference import JobPreference
 from app.models.job_cache import JobCache
-from app.models.application import Application, ApplicationStatusHistory, Company, Document, Track
+from app.models.application import (
+    Application,
+    ApplicationDocument,
+    ApplicationStatusHistory,
+    Company,
+    Document,
+    Track,
+)
 
 __all__ = [
     "User",
@@ -18,5 +25,6 @@ __all__ = [
     "Track",
     "Document",
     "Application",
+    "ApplicationDocument",
     "ApplicationStatusHistory",
 ]

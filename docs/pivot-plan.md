@@ -232,6 +232,26 @@ M2 플레이스홀더 `components/village/VillageScene.tsx`: DOM/CSS 격자(건�
 
 ---
 
+## M2.6 제출물 다대다 — ✅ 완료 (2026-09-10, 자소서 배제 채용 트렌드 대응)
+
+**계기:** 한화생명·SK하이닉스·신한은행 등이 자소서를 빼는 흐름. 승률 엔진 자체는 상태 전이(`application_status_history`) 위에 서 있어 영향이 없지만, **지원 1건 = 이력서 1개** 가정이 병목이었다. 이력서+포트폴리오+경험기술서를 함께 내는 전형에서는 "포트폴리오 v2 를 붙인 지원의 서류 통과율"을 물을 수 없다. 데이터가 쌓이기 전에 처리해 이전 비용을 없앴다.
+
+**구현:**
+- `models/application.py` — `ApplicationDocument`(application_id·document_id·attached_at, `UNIQUE(app,doc)`, doc 인덱스). `Application.resume_document_id` **제거**, `Application.documents` 다대다(`secondary`, selectin)로 대체. `DOC_TYPES` 에 `experience`(경험기술서)·`other` 추가 + `DOC_TYPE_LABELS`.
+- `alembic e5f6a7b8c9d0` — 테이블 생성 → 기존 `resume_document_id` 값을 조인 테이블로 이전 → 컬럼 드롭 → `ck_documents_doc_type` 교체. downgrade 는 지원별 가장 먼저 붙인 제출물 하나만 되돌리고(나머지 연결 소실), 새 doc_type 값을 `resume` 로 정리한 뒤 CHECK 복원.
+- `application_service.py` — `doc_ref`, `primary_resume`(이력서 종류 첫 번째 = 기존 `resume_document` 응답의 파생), `attach_document`/`detach_document`/`set_documents`/`replace_resume`. **모두 컬렉션만 조작** — `secondary` 관계가 연결 행을 관리하므로 직접 INSERT 하면 UNIQUE 에 걸린다.
+- `routes/applications.py` — `_resolve_refs`(회사·트랙) / `_resolve_doc` · `_resolve_docs`(제출물) 분리. 생성·수정에서 `documents` 는 집합 전체 대체, `resume_document_*` 는 이력서 슬롯만 교체. `POST /{id}/documents`·`DELETE /{id}/documents/{doc_id}` 추가. `GET /stats` 에 **`by_document`**(제출물 버전별 total/applied/passed_docs/interview/offer).
+- `notion_import.py` — '이력서 버전' 은 `documents=[doc]` / `replace_resume` 로.
+- 프런트 — `types/application.ts`(`DocType`·`DOC_TYPE_LABELS`·`DocumentInput`·`Application.documents`·`Stats.by_document`), `ApplicationForm` 에 "추가 제출물" 반복 입력(제목+종류+빼기, 제출 시 `documents` 로 집합 전체 전송), `ApplicationDetail` 은 이력서 한 줄 대신 제출물 전체를 종류 라벨과 함께 표시.
+
+**검증:** pytest **49 통과**(신규 `test_multiple_documents_and_win_rate_by_document`: 이력서+포폴 동시 생성 → 경험기술서 추가 → `by_document` 승률 분리 → 이력서만 교체해도 포폴·경험기술서 유지 → 연결 해제 후 문서는 존속 → 재해제 404 → `documents` 집합 대체). `alembic heads` = `e5f6a7b8c9d0`. 실행 중 서버에 httpx 로 생성·교체·통계 왕복 확인. tsc 통과, Playwright 로 폼 입력 → 상세에 "제출물: 이력서 v5 (이력서) · 포트폴리오 v3 (포트폴리오) · 경험기술서 v2 (경험기술서)" 확인, 페이지 에러 0.
+
+**남긴 판단:**
+- **전형 단계는 그대로.** AI 역량검사·직무적합성 검사 같은 새 관문은 `status` 가 String+CHECK 라 라벨 한 줄 + 마이그레이션 하나로 붙는다. 실제 수요를 보고 결정.
+- **승률 분모 주의.** 자소서가 빠지면 지원 비용이 낮아져 건수가 늘고 통과율이 떨어진다. 실력 저하가 아니라 전략 변화이므로 `hiring_type`(공채·수시·상시)별로 갈라 보여줘야 오도하지 않는다. 컬럼은 이미 있고 통계 축 추가만 남았다.
+- **버전 신호는 약해지고 타이밍 신호가 세진다.** 자소서는 회사마다 새로 쓰지만 이력서는 분기에 한 번 고친다. 다음 인사이트 축은 `discovered_at → applied_at` 리드타임과 `hiring_type` 이다.
+- Postgres 실마이그레이션은 여전히 미검증(Docker 없음) — 배포 전 `alembic upgrade head` 1회 필요.
+
 ## M3. 월드 신호 + NPC 선제 대사 + 트래커 툴
 
 ### 3-1. `GET /api/world/state` — `routes/world.py`, `services/npc_prompt_service.py`

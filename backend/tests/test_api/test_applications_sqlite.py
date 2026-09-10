@@ -15,7 +15,14 @@ from sqlalchemy.pool import StaticPool
 from app.api.middleware.auth import get_current_user_id
 from app.dependencies import get_db
 from app.main import app
-from app.models.application import Application, ApplicationStatusHistory, Company, Document, Track
+from app.models.application import (
+    Application,
+    ApplicationDocument,
+    ApplicationStatusHistory,
+    Company,
+    Document,
+    Track,
+)
 from app.models.user import Base, User
 
 USER_ID = uuid.uuid4()
@@ -26,6 +33,7 @@ TABLES = [
     Track.__table__,
     Document.__table__,
     Application.__table__,
+    ApplicationDocument.__table__,
     ApplicationStatusHistory.__table__,
 ]
 
@@ -235,3 +243,82 @@ async def test_notion_csv_import_dry_run_then_commit(client):
     assert summary["urgent_deadlines"] == [] or all(
         a["d_day"] <= 3 for a in summary["urgent_deadlines"]
     )
+
+
+async def test_multiple_documents_and_win_rate_by_document(client):
+    """자소서를 빼고 이력서·포트폴리오·경험기술서를 함께 내는 전형 대응.
+
+    지원 1건에 제출물 여러 개가 붙고, 통계는 제출물 버전별로 갈린다.
+    """
+    today = date.today()
+
+    # 이력서 + 포트폴리오를 함께 낸 지원
+    r = await client.post(
+        "/api/applications",
+        json={
+            "company_name": "SK하이닉스",
+            "position": "데이터 엔지니어",
+            "status": "doc_passed",
+            "resume_document_title": "이력서 v3",
+            "documents": [{"title": "포트폴리오 v2", "doc_type": "portfolio"}],
+        },
+    )
+    assert r.status_code == 201, r.text
+    a1 = r.json()
+    assert {d["title"] for d in a1["documents"]} == {"이력서 v3", "포트폴리오 v2"}
+    # resume_document 는 이력서 종류에서 파생 — 기존 응답 모양이 유지된다
+    assert a1["resume_document"]["title"] == "이력서 v3"
+    assert a1["resume_document"]["doc_type_label"] == "이력서"
+
+    # 경험기술서를 나중에 붙인다
+    r = await client.post(
+        f"/api/applications/{a1['id']}/documents",
+        json={"title": "경험기술서 v1", "doc_type": "experience"},
+    )
+    assert r.status_code == 201, r.text
+    assert len(r.json()["documents"]) == 3
+
+    # 같은 이력서를 쓴 두 번째 지원 — 이쪽은 탈락
+    r = await client.post(
+        "/api/applications",
+        json={
+            "company_name": "한화생명",
+            "position": "데이터 엔지니어",
+            "status": "rejected",
+            "end_stage": "document",
+            "resume_document_title": "이력서 v3",
+        },
+    )
+    assert r.status_code == 201, r.text
+
+    # 제출물 버전별 승률: 이력서 v3 은 2건 중 1건 서류통과, 포트폴리오 v2 는 1건 중 1건
+    stats = (await client.get("/api/applications/stats")).json()
+    by_doc = {d["title"]: d for d in stats["by_document"]}
+    assert by_doc["이력서 v3"]["total"] == 2 and by_doc["이력서 v3"]["passed_docs"] == 1
+    assert by_doc["포트폴리오 v2"]["total"] == 1 and by_doc["포트폴리오 v2"]["passed_docs"] == 1
+    assert by_doc["경험기술서 v1"]["doc_type_label"] == "경험기술서"
+
+    # 이력서만 갈아끼운다 — 포트폴리오·경험기술서 연결은 그대로
+    r = await client.patch(
+        f"/api/applications/{a1['id']}", json={"resume_document_title": "이력서 v4"}
+    )
+    assert r.status_code == 200, r.text
+    titles = {d["title"] for d in r.json()["documents"]}
+    assert titles == {"이력서 v4", "포트폴리오 v2", "경험기술서 v1"}
+    assert r.json()["resume_document"]["title"] == "이력서 v4"
+
+    # 연결만 끊는다 — 문서 자체는 남아 다른 지원에서 계속 쓸 수 있다
+    doc_id = next(d["id"] for d in r.json()["documents"] if d["title"] == "포트폴리오 v2")
+    r = await client.delete(f"/api/applications/{a1['id']}/documents/{doc_id}")
+    assert r.status_code == 200 and len(r.json()["documents"]) == 2
+    assert any(d["title"] == "포트폴리오 v2" for d in (await client.get("/api/documents")).json())
+    # 이미 끊긴 연결을 또 끊으면 404
+    assert (await client.delete(f"/api/applications/{a1['id']}/documents/{doc_id}")).status_code == 404
+
+    # documents 를 주면 집합 전체가 대체된다
+    r = await client.patch(
+        f"/api/applications/{a1['id']}",
+        json={"documents": [{"title": "이력서 v4"}]},
+    )
+    assert [d["title"] for d in r.json()["documents"]] == ["이력서 v4"]
+    assert today.year > 2000  # 날짜 고정 없이도 도는 흐름

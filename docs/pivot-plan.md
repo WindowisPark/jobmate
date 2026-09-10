@@ -305,7 +305,36 @@ M2 플레이스홀더 `components/village/VillageScene.tsx`: DOM/CSS 격자(건�
 
 **보류한 결정:** 공고 게시판 건물. 지금 방에 간판이 서 있고 누르면 준비 중 안내가 뜬다. 링크 모음으로 바꾸거나 간판을 빼야 한다. `search_jobs` 는 키가 없으면 링크만 주므로 해가 없어 **사람인 키 신청을 서두를 이유는 사라졌다.**
 
-## M3. 월드 신호 + NPC 선제 대사 + 트래커 툴
+## M3. 월드 신호 + NPC 선제 대사 + 트래커 툴 — ✅ 완료 (2026-09-10)
+
+**한 줄:** 방이 데이터를 알고 먼저 말을 건다. 노션이 못 하는 유일한 부분이다.
+
+**백엔드**
+- `GET /api/world/state` — 지원 요약을 신호로 바꿔 내려준다(책상 점등·NPC 표정·말풍선). 계산은 `build_application_summary` 하나에서만 나온다(채팅 컨텍스트와 같은 진실).
+- `services/npc_prompt_service.py` — **템플릿만, LLM 0회.** 마감·마감초과·탈락스트릭·축하·다음일정·무활동 6종. 에이전트당 하나, 최대 3개. 마감이 가까울수록 위로.
+- `POST /prompts/{id}/accept` — 그 대사를 DM 에 agent 메시지로 남긴다. **여기서도 LLM 은 안 돈다.** 사용자가 답장할 때 history 로 읽혀 맥락이 이어진다. dismiss 24h, 축하 ack 7d(Redis).
+- LangGraph: 상태에 `application_summary`, WS 경로와 `chat_service` 양쪽에서 로드. 네 노드가 `format_application_context` 로 각자 관점의 한 문단을 받는다.
+- 플래너: `_prepend_step` 헬퍼 추출(재정렬 로직 단일화) + `_apply_tracker_override`. 마감 임박 → 탐색이, 탈락 스트릭 → 토닥이, 축하 → 꿀팁이 보조.
+- 도구 9→11: `get_my_applications` · `update_application_status`. **M2.5 에서 실행기를 공용화해 둔 덕에 등록만으로 세션이 붙었다.** 탈락에 종료단계가 없으면 고치지 않고 되묻고, 여러 건이 걸리면 `ambiguous` 를 주고 아무것도 바꾸지 않는다.
+- `Message` 의 JSON 컬럼에 sqlite variant — 운영 스키마는 그대로, Docker 없이 채팅 경로를 테스트할 수 있게 됨.
+
+**프런트**
+- `worldStore` 재작성 — 신호·말풍선을 서버에서 받는다. 방 진입·탭 복귀·패널에서 방으로 돌아올 때 갱신.
+- `MallangRoom` 에 `bubbles` prop. **하드코딩 예시 문구 제거.** 말풍선을 누르면 accept → DM 이동 + 답장 초안이 채워진 상태로 시작. ✕ 로 닫으면 하루 조용.
+- 도구 결과 카드 2종 추가(`ApplicationListCard`·`StatusChangeResult`). ambiguous 면 "안 바꿨다"고 보여준다.
+- **공고 게시판을 실제로 쓸 수 있게 바꿈**(준비 중 안내 제거). 검색은 채용 사이트로 내보내고, 발견한 공고를 트래커에 담는 다리 역할만 한다. M2.7 의 판단("탐색은 축이 아니다")과 같은 선.
+
+**검증:** pytest 104 통과(신규 4파일 51건). Playwright 로 실데이터 왕복 — 마감 D-1 책상 점등, 탐색이가 이력서 버전을 짚어 말 걸기, 탈락 3건에 토닥이 등장, 말풍선 → DM 이동 + 대사 저장 + 초안 채움, 공고 게시판 담기 폼. 페이지 에러 0.
+
+**고친 것 (테스트·실행이 잡음)**
+- 최종합격 직후 "요즘 쉬고 있구나" 가 같이 뜨던 규칙 → 축하·최근결과가 있으면 무활동 체크인을 막는다.
+- 말풍선이 `.sprite { pointer-events: none }` 때문에 안 눌리던 문제.
+- 방 오른쪽 친구의 말풍선이 방 밖으로 새던 문제 → 줄바꿈 + 가장자리 정렬.
+- `dev_sqlite` 의 FakeRedis 에 `setex`·`mget` 이 없어 월드 API 가 500. agents·messages 테이블도 추가.
+
+**남은 것:** DM 은 아직 지난 대화를 불러오지 않는다(원래 그랬다). 수락한 대사는 응답으로 받아 화면에 직접 올려 우회했다. 대화 이력 로딩은 별건.
+
+### (원 계획)
 
 ### 3-1. `GET /api/world/state` — `routes/world.py`, `services/npc_prompt_service.py`
 `build_application_summary` 재사용(chat.py와 단일 진실).

@@ -256,3 +256,32 @@
   .bubbleSecondary, .labelSoon { display: none; }
   .bubble { max-width: 40vw; }
 }
+
+/* 서버가 준 말풍선은 눌러서 대화로 넘어간다.
+   .sprite/.npc 가 pointer-events: none 이라 여기서 다시 켜야 눌린다. */
+.bubbleBody, .bubbleClose { pointer-events: auto; }
+.bubbleBody {
+  background: transparent; border: 0; padding: 0; margin: 0; font: inherit; color: inherit;
+  cursor: pointer; text-align: left;
+}
+.bubbleClose {
+  background: transparent; border: 0; padding: 0 0 0 6px; margin: 0; cursor: pointer;
+  color: #8a7a68; font-size: 11px; line-height: 1;
+}
+.bubbleClose:hover { color: #3b2f26; }
+.pixel .bubbleClose { font-family: var(--font-pixel); }
+
+/* 서버 대사는 길이가 제각각이라 줄바꿈을 허용한다 */
+.bubbleLive {
+  white-space: normal; max-width: 210px; text-align: left;
+  display: flex; align-items: flex-start; gap: 2px;   /* 닫기 ✕ 를 본문 옆에 붙인다 */
+}
+.bubbleLive .bubbleClose { flex: 0 0 auto; margin-top: 1px; }
+/* 방 가장자리: 밖으로 새지 않게 한쪽에 붙인다 */
+.bubbleLeft { left: 0; transform: none; }
+.bubbleLeft::after { left: 22px; }
+.bubbleRight { left: auto; right: 0; transform: none; }
+.bubbleRight::after { left: auto; right: 22px; transform: rotate(45deg); }
+@media (max-width: 640px) {
+  .bubbleLive { max-width: 42vw; }
+}

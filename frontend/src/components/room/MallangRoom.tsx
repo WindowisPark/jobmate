@@ -4,12 +4,13 @@
 // 도착하면 바로 열지 않고 '확인' 간판이 뜬다 — 다시 탭하거나 Enter/Space 로 열기. 방을 떠나는 동작(채팅)이 특히 그렇다.
 // 픽셀 테마는 방 폭을 원본(176px)의 정수배로 스냅하고 image-rendering: pixelated 로 그린다.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import s from "./MallangRoom.module.css";
 import {
   HOP_MS, PIXEL_THEME, WALK_SPEED_X,
   canStand, targetKey, targetLabel, targetNear,
-  type Box, type Hotspot, type OpenTarget, type Pct, type RoomNpc, type RoomTheme,
+  type Box, type Hotspot, type OpenTarget, type Pct,
+  type RoomAgentId, type RoomBubble, type RoomNpc, type RoomTheme,
 } from "./roomLayout";
 
 export interface MallangRoomProps {
@@ -20,6 +21,12 @@ export interface MallangRoomProps {
   litLabel?: string;
   /** 미니미 그림·이름. 없으면 테마 기본 */
   me?: { src?: string; name?: string };
+  /** 서버가 준 NPC 선제 대사. 주면 테마의 예시 문구 대신 이걸 띄운다 */
+  bubbles?: readonly RoomBubble[];
+  /** 말풍선을 눌렀을 때 — 그 친구와의 대화로 넘어간다 */
+  onBubbleAccept?: (bubble: RoomBubble) => void;
+  /** 말풍선을 닫았을 때 */
+  onBubbleDismiss?: (bubble: RoomBubble) => void;
   /** 확인 단계를 거쳐 열기로 결정됐을 때 */
   onOpen: (target: OpenTarget) => void;
 }
@@ -40,7 +47,17 @@ function isTypingTarget(el: Element | null) {
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (el as HTMLElement).isContentEditable;
 }
 
-export function MallangRoom({ theme = PIXEL_THEME, lit = false, litLabel, me, onOpen }: MallangRoomProps) {
+export function MallangRoom({
+  theme = PIXEL_THEME, lit = false, litLabel, me, bubbles, onBubbleAccept, onBubbleDismiss, onOpen,
+}: MallangRoomProps) {
+  // 서버 말풍선을 에이전트별로 하나씩. 우선순위는 서버가 이미 정렬해 보낸다.
+  const bubbleByAgent = useMemo(() => {
+    const m = new Map<RoomAgentId, RoomBubble>();
+    for (const b of bubbles ?? []) if (!m.has(b.agentId)) m.set(b.agentId, b);
+    return m;
+  }, [bubbles]);
+  const topBubbleId = bubbles?.[0]?.id;
+
   const hostRef = useRef<HTMLDivElement>(null);
   const roomRef = useRef<HTMLDivElement>(null);
   const meRef = useRef<HTMLDivElement>(null);
@@ -284,12 +301,38 @@ export function MallangRoom({ theme = PIXEL_THEME, lit = false, litLabel, me, on
         })}
 
         {/* 친구(NPC) — 탭하면 곁으로 가서 대화 확인 */}
-        {theme.npcs.map((n, i) => (
+        {theme.npcs.map((n) => {
+          const live = bubbleByAgent.get(n.id);
+          const text = live?.text ?? (bubbles ? undefined : n.bubble);
+          // 좁은 화면에서는 우선순위가 가장 높은 하나만 — 겹치면 방이 시끄럽다
+          const secondary = live ? live.id !== topBubbleId : false;
+          // 방 가장자리에 선 친구의 말풍선은 밖으로 새지 않게 붙여 세운다
+          const edge = n.pos.x > 68 ? s.bubbleRight : n.pos.x < 32 ? s.bubbleLeft : "";
+          return (
           <div key={n.id} className={`${s.sprite} ${s.npc}`} style={footStyle(n.pos)} title={`${n.name} · ${n.role}`}>
-            {n.bubble && (
-              /* 좁은 화면에서는 첫 말풍선 하나만 — 겹침 방지. M3 에서 우선순위는 npc_prompts 가 정한다 */
-              <div className={`${s.bubble} ${theme.npcs.findIndex((m) => m.bubble) !== i ? s.bubbleSecondary : ""}`}>
-                <b>{n.name}</b> {n.bubble}
+            {text && (
+              <div className={`${s.bubble} ${live ? s.bubbleLive : ""} ${edge} ${secondary ? s.bubbleSecondary : ""}`}>
+                {live ? (
+                  <>
+                    <button
+                      type="button"
+                      className={s.bubbleBody}
+                      onClick={() => onBubbleAccept?.(live)}
+                    >
+                      <b>{n.name}</b> {text}
+                    </button>
+                    <button
+                      type="button"
+                      className={s.bubbleClose}
+                      aria-label="말풍선 닫기"
+                      onClick={() => onBubbleDismiss?.(live)}
+                    >
+                      ✕
+                    </button>
+                  </>
+                ) : (
+                  <><b>{n.name}</b> {text}</>
+                )}
               </div>
             )}
             <button type="button" className={s.npcHit} aria-label={`${n.name}와 이야기하기`} onClick={() => hopTo(n.stand, npcIntent(n))}>
@@ -300,7 +343,8 @@ export function MallangRoom({ theme = PIXEL_THEME, lit = false, litLabel, me, on
             <div className={s.shadow} />
             <span className={s.nameTag}>{n.name}<small className={s.role}>{n.role}</small></span>
           </div>
-        ))}
+          );
+        })}
 
         {/* 미니미 */}
         <div ref={meRef} className={`${s.sprite} ${s.me}`} style={{ ...footStyle(mePos), transitionDuration: walking ? "0ms" : `${HOP_MS}ms` }}>

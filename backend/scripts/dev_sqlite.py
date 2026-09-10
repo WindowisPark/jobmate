@@ -23,7 +23,7 @@ from app import dependencies  # noqa: E402  (env 설정 뒤에 import 해야 eng
 
 
 class FakeRedis:
-    """auth 라우트가 쓰는 세 메서드만 흉내낸다."""
+    """auth·world 라우트가 쓰는 메서드만 흉내낸다. TTL 은 무시한다."""
 
     def __init__(self) -> None:
         self.store: dict[str, str] = {}
@@ -37,19 +37,28 @@ class FakeRedis:
     async def delete(self, key: str) -> None:
         self.store.pop(key, None)
 
+    async def setex(self, key: str, ttl: int, value: str) -> None:  # noqa: ARG002
+        self.store[key] = value
+
+    async def mget(self, keys: list[str]) -> list[str | None]:
+        return [self.store.get(k) for k in keys]
+
 
 dependencies.redis_client = FakeRedis()  # type: ignore[assignment]
 
 from app.models.application import (  # noqa: E402
     Application, ApplicationDocument, ApplicationStatusHistory, Company, Document, Track,
 )
+from app.models.agent_state import Agent  # noqa: E402
 from app.models.conversation import Conversation  # noqa: E402
+from app.models.message import Message  # noqa: E402
 from app.models.user import Base, User  # noqa: E402
 
 TABLES = [
     User.__table__, Company.__table__, Track.__table__, Document.__table__,
     Application.__table__, ApplicationDocument.__table__,
-    ApplicationStatusHistory.__table__, Conversation.__table__,
+    ApplicationStatusHistory.__table__, Agent.__table__,
+    Conversation.__table__, Message.__table__,
 ]
 
 
@@ -57,10 +66,31 @@ async def init_db() -> None:
     async with dependencies.engine.begin() as conn:
         await conn.run_sync(lambda c: Base.metadata.create_all(c, tables=TABLES))
 
+    # messages.agent_id 가 agents 를 참조한다 — 말풍선 수락이 DM 에 메시지를 남기려면 필요
+    from sqlalchemy import select
+
+    from app.agents.profiles import AGENT_PROFILES
+
+    async with dependencies.async_session() as db:
+        existing = set((await db.execute(select(Agent.id))).scalars().all())
+        for aid, prof in AGENT_PROFILES.items():
+            if aid in existing:
+                continue
+            db.add(
+                Agent(
+                    id=aid,
+                    name=prof["name"],
+                    role=prof["role"],
+                    personality=prof["personality"],
+                    avatar_url=f"/room/pixel/blob_{aid}.png",
+                )
+            )
+        await db.commit()
+
 
 if __name__ == "__main__":
     asyncio.run(init_db())
     import uvicorn
 
-    print(f"[dev_sqlite] DB = {os.environ['JOBMATE_DATABASE_URL']}  (채팅·공고검색 비활성)")
+    print(f"[dev_sqlite] DB = {os.environ['JOBMATE_DATABASE_URL']}  (채팅 LLM·공고검색 비활성)")
     uvicorn.run("app.main:app", host="127.0.0.1", port=int(os.environ.get("PORT", "8000")), log_level="warning")

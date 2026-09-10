@@ -157,3 +157,7 @@
 .rate { font-weight: 700; color: var(--accent-green); }
 .rateWeak { color: var(--text-muted); }
 .rateWeakMark { font-size: 9px; margin-left: 2px; opacity: 0.7; }
+
+/* 공고 게시판 — 채용 사이트로 나가는 링크 */
+.siteLinks { display: flex; gap: 6px; flex-wrap: wrap; }
+.siteLinks a { text-decoration: none; }

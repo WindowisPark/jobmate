@@ -30,8 +30,15 @@ export interface RoomNpc {
   role: string;
   pos: Pct;                 // 발 위치
   stand: Pct;               // 미니미가 말 걸러 가서 서는 자리
-  bubble?: string;
+  bubble?: string;          // 스파이크 미리보기용 예시 문구. 실제 대사는 서버가 준다.
   flip?: boolean;
+}
+
+/** 서버(GET /api/world/state)가 준 NPC 선제 대사 */
+export interface RoomBubble {
+  id: string;
+  agentId: RoomAgentId;
+  text: string;
 }
 
 /** 도착 후 '확인' 단계를 거쳐 열리는 대상 */
@@ -92,8 +99,8 @@ export const PIXEL_THEME: RoomTheme = {
   hotspots: PIXEL_HOTSPOTS,
   solids: [tbox(6, 2, 1, 2), tbox(0, 7, 1, 1), tbox(10, 7, 1, 1)],
   npcs: [
-    { id: "jun_ho", name: "탐색이", role: "취업 리서처", pos: tpt(5.5, 3.5), stand: tpt(4.4, 3.6), bubble: "카카오 서류 마감 내일이야!" },
-    { id: "ha_eun", name: "토닥이", role: "멘탈 케어", pos: tpt(8.5, 5.4), stand: tpt(7.5, 6.6), bubble: "잠깐 숨 고르고 가자" },
+    { id: "jun_ho", name: "탐색이", role: "취업 리서처", pos: tpt(5.5, 3.5), stand: tpt(4.4, 3.6) },
+    { id: "ha_eun", name: "토닥이", role: "멘탈 케어", pos: tpt(8.5, 5.4), stand: tpt(7.5, 6.6) },
     { id: "min_su", name: "꿀팁이", role: "현직자 멘토", pos: tpt(6.5, 7.5), stand: tpt(5.4, 7.5), flip: true },
   ],
   meStart: tpt(5.5, 5.6),
@@ -147,8 +154,8 @@ export const MALLANG_THEME: RoomTheme = {
   ],
   solids: [],
   npcs: [
-    { id: "jun_ho", name: "탐색이", role: "취업 리서처", pos: { x: 48, y: 58 }, stand: { x: 38, y: 60 }, bubble: "카카오 서류 마감 내일이야!" },
-    { id: "ha_eun", name: "토닥이", role: "멘탈 케어", pos: { x: 69, y: 76 }, stand: { x: 52, y: 84 }, bubble: "잠깐 숨 고르고 가자" },
+    { id: "jun_ho", name: "탐색이", role: "취업 리서처", pos: { x: 48, y: 58 }, stand: { x: 38, y: 60 } },
+    { id: "ha_eun", name: "토닥이", role: "멘탈 케어", pos: { x: 69, y: 76 }, stand: { x: 52, y: 84 } },
     { id: "min_su", name: "꿀팁이", role: "현직자 멘토", pos: { x: 88, y: 89 }, stand: { x: 78, y: 92 }, flip: true },
   ],
   meStart: { x: 40, y: 88 },

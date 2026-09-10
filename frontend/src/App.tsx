@@ -9,6 +9,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { ToastContainer } from "@/components/common/ToastContainer";
 import { api } from "@/utils/api";
 import { VillageLayout } from "@/components/village/VillageLayout";
+import { JobBoardBuilding } from "@/components/tracker/JobBoardBuilding";
 import { ComingSoonBuilding, TrackerBuilding } from "@/components/tracker/TrackerBuilding";
 import { ChatBuilding } from "@/components/village/ChatBuilding";
 
@@ -149,7 +150,7 @@ function AppContent() {
         <Route path="tracker/:id" element={<TrackerBuilding mode="detail" />} />
         <Route path="chat/:roomId" element={<ChatBuilding />} />
         <Route path="documents" element={<ComingSoonBuilding label="이력서·자소서" note="이력서·자소서 보관함은 다음 건물이에요. 지금은 지원 내역에 '이력서 버전' 이름만 달아두세요." />} />
-        <Route path="jobs" element={<ComingSoonBuilding label="공고 게시판" note="공고 탐색은 채팅에서 탐색이에게 물어보세요 — 게시판 건물은 준비 중입니다." />} />
+        <Route path="jobs" element={<JobBoardBuilding />} />
       </Route>
       <Route path="/chat/*" element={<Layout />} />
       <Route path="*" element={<Navigate to="/village" replace />} />

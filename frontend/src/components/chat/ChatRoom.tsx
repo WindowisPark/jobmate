@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { MentionPopup } from "./MentionPopup";
@@ -15,8 +15,14 @@ export function ChatRoom({ embedded = false }: { embedded?: boolean } = {}) {
   const [showMention, setShowMention] = useState(false);
   const [mentionFilter, setMentionFilter] = useState("");
   const [moodSelected, setMoodSelected] = useState(false);
-  const { activeRoomId, rooms, addMessage } = useChatStore();
+  const { activeRoomId, rooms, addMessage, takePendingReply } = useChatStore();
   const { sendMessage } = useWebSocket(activeRoomId);
+
+  // 방 말풍선을 눌러 들어왔다면 답장 초안이 채워진 채로 시작한다
+  useEffect(() => {
+    const draft = takePendingReply(activeRoomId);
+    if (draft) setInput(draft);
+  }, [activeRoomId, takePendingReply]);
 
   const activeRoom = rooms.find((r) => r.id === activeRoomId);
   const isDM = activeRoom?.type === "dm";

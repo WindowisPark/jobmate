@@ -1,10 +1,12 @@
 import type { ChatMessage } from "@/types/chat";
 import { AGENTS } from "@/types/agent";
 import { AgentAvatar } from "@/components/common/AgentAvatar";
+import ApplicationListCard from "./ApplicationListCard";
 import BreathingExercise from "./BreathingExercise";
 import MockInterviewCard from "./MockInterviewCard";
 import MotivationContent from "./MotivationContent";
 import ResumeFeedbackCard from "./ResumeFeedbackCard";
+import StatusChangeResult from "./StatusChangeResult";
 import type { ToolResult } from "@/stores/chatStore";
 
 interface Props {
@@ -48,6 +50,10 @@ function renderToolResult(result: ToolResult) {
       return <ResumeFeedbackCard key={result.timestamp} data={result.data} />;
     case "mock_interview":
       return <MockInterviewCard key={result.timestamp} data={result.data} />;
+    case "get_my_applications":
+      return <ApplicationListCard key={result.timestamp} data={result.data} />;
+    case "update_application_status":
+      return <StatusChangeResult key={result.timestamp} data={result.data} />;
     default:
       return null;
   }

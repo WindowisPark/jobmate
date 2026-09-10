@@ -30,6 +30,10 @@ interface ChatState {
   finalizeMessage: (agentId: AgentId) => void;
   setTyping: (agentId: AgentId, isTyping: boolean) => void;
   addToolResult: (roomId: string, result: ToolResult) => void;
+  /** 방 말풍선을 눌러 들어올 때 채워둘 답장 초안 (roomId → 문구) */
+  pendingReply: { roomId: string; text: string } | null;
+  setPendingReply: (roomId: string, text: string) => void;
+  takePendingReply: (roomId: string) => string | null;
 }
 
 const DEFAULT_ROOMS: ChatRoom[] = [
@@ -40,7 +44,7 @@ const DEFAULT_ROOMS: ChatRoom[] = [
   { id: "dm-min_su", type: "dm", name: "꿀팁이", agentId: "min_su" },
 ];
 
-export const useChatStore = create<ChatState>((set) => ({
+export const useChatStore = create<ChatState>((set, get) => ({
   rooms: DEFAULT_ROOMS,
   activeRoomId: "general",
   messages: {},
@@ -105,4 +109,12 @@ export const useChatStore = create<ChatState>((set) => ({
         toolResults: { ...state.toolResults, [roomId]: [...prev, result] },
       };
     }),
+  pendingReply: null,
+  setPendingReply: (roomId, text) => set({ pendingReply: { roomId, text } }),
+  takePendingReply: (roomId) => {
+    const p = get().pendingReply;
+    if (!p || p.roomId !== roomId) return null;
+    set({ pendingReply: null });
+    return p.text;
+  },
 }));

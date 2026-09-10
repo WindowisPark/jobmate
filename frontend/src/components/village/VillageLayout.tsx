@@ -1,11 +1,11 @@
 // 마을 홈 — 방(MallangRoom) + 가구 패널(Outlet). 데스크톱은 우측 패널, 모바일은 전체 화면 시트.
-import { useEffect } from "react";
+// 방의 신호(책상 점등·말풍선)는 전부 서버(GET /api/world/state)에서 온다.
+import { useCallback, useEffect, useMemo } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { MallangRoom } from "@/components/room/MallangRoom";
-import type { HotspotId, OpenTarget } from "@/components/room/roomLayout";
+import type { HotspotId, OpenTarget, RoomBubble } from "@/components/room/roomLayout";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import { useApplicationStore, selectUrgent } from "@/stores/applicationStore";
-import { dDay, ddayLabel } from "@/types/application";
+import { useChatStore } from "@/stores/chatStore";
 import { HOTSPOT_ROUTES, npcChatRoute, useWorldStore } from "@/stores/worldStore";
 import { toast } from "@/stores/toastStore";
 import s from "./Village.module.css";
@@ -21,17 +21,32 @@ export function VillageLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = useIsMobile();
-  const { activeHotspot, enter, exit } = useWorldStore();
-  const items = useApplicationStore((st) => st.items);
-  const loaded = useApplicationStore((st) => st.loaded);
-  const fetchAll = useApplicationStore((st) => st.fetchAll);
+  const { activeHotspot, enter, exit, buildings, prompts, refresh, accept, dismiss } =
+    useWorldStore();
+  const setPendingReply = useChatStore((st) => st.setPendingReply);
+  const addMessage = useChatStore((st) => st.addMessage);
 
-  // 방 신호는 실제 데이터에서 — 마감 3일 이내 진행 건이 있으면 책상 점등
-  useEffect(() => { if (!loaded) void fetchAll(); }, [loaded, fetchAll]);
-  const urgent = selectUrgent(items);
-  const lit = urgent.length > 0;
-  const minD = urgent.reduce<number | null>((m, a) => { const d = dDay(a.deadline_at); return d === null ? m : m === null ? d : Math.min(m, d); }, null);
-  const litLabel = lit ? ddayLabel(minD) : undefined;
+  // 방에 들어올 때, 그리고 탭으로 돌아올 때 신호를 다시 받는다
+  useEffect(() => {
+    void refresh();
+    const onVisible = () => { if (document.visibilityState === "visible") void refresh(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [refresh]);
+
+  // 패널에서 무언가 바꾸고 방으로 돌아오면 신호가 낡는다
+  useEffect(() => {
+    if (location.pathname === "/village") void refresh();
+  }, [location.pathname, refresh]);
+
+  const tracker = buildings.find((b) => b.id === "tracker");
+  const lit = tracker?.lit ?? false;
+  const litLabel = tracker?.label ?? undefined;
+
+  const bubbles: RoomBubble[] = useMemo(
+    () => prompts.map((p) => ({ id: p.id, agentId: p.agent_id, text: p.text })),
+    [prompts],
+  );
 
   // URL ↔ 열린 가구 동기화 (뒤로가기로 패널이 닫힌다)
   useEffect(() => {
@@ -53,6 +68,27 @@ export function VillageLayout() {
     navigate(route);
   };
 
+  // 말풍선을 누르면 그 대사가 DM 에 남고, 답장 초안이 채워진 채 대화가 열린다
+  const onBubbleAccept = useCallback(
+    async (b: RoomBubble) => {
+      const result = await accept(b.id);
+      if (!result) return;
+      // 서버는 이 대사를 DM 에 이미 저장했다. 화면에도 같은 줄을 올려 대화가 이어지게 한다.
+      // (DM 은 아직 지난 대화를 불러오지 않는다 — 그래서 여기서 직접 넣는다)
+      addMessage(result.room_id, {
+        id: crypto.randomUUID(),
+        conversationId: result.room_id,
+        senderType: "agent",
+        agentId: result.agent_id,
+        content: result.text,
+        createdAt: new Date().toISOString(),
+      });
+      if (result.suggested_reply) setPendingReply(result.room_id, result.suggested_reply);
+      navigate(`/village/chat/${result.room_id}`);
+    },
+    [accept, addMessage, navigate, setPendingReply],
+  );
+
   const panelOpen = activeHotspot !== null && location.pathname !== "/village";
 
   return (
@@ -62,7 +98,14 @@ export function VillageLayout() {
           <span className={s.brand}>JobMate <small>내 방</small></span>
           <nav className={s.nav} />
         </header>
-        <MallangRoom lit={lit} litLabel={litLabel} onOpen={onOpen} />
+        <MallangRoom
+          lit={lit}
+          litLabel={litLabel}
+          bubbles={bubbles}
+          onBubbleAccept={onBubbleAccept}
+          onBubbleDismiss={(b) => void dismiss(b.id)}
+          onOpen={onOpen}
+        />
         {!panelOpen && (
           <p className={s.hint}>가구나 친구를 누르거나 방향키로 걸어가세요 · 도착하면 한 번 더 눌러 열어요 · 책상이 빛나면 마감 3일 안</p>
         )}
